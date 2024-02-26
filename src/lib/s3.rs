@@ -1,22 +1,25 @@
+use std::sync::{Arc, Mutex};
+
 use anyhow::{anyhow, ensure};
+use async_tempfile::TempFile;
+use foundations::telemetry::log::{debug, trace};
 use md5::{Digest, Md5};
 use reqwest::{header::ETAG, IntoUrl};
-use std::{
-    path::Path,
-    sync::{Arc, Mutex},
-};
 use tokio_util::io::{InspectReader, ReaderStream};
 
 pub async fn upload_file(
-    client: reqwest::Client,
-    path: impl AsRef<Path>,
+    client: &reqwest::Client,
+    reader: TempFile,
     target_url: impl IntoUrl,
 ) -> anyhow::Result<()> {
+    let target_url: reqwest::Url = target_url.into_url()?;
+    let target_url_string = target_url.to_string();
+    debug!("uploading file"; "url" => &target_url_string);
+
     let hasher = Md5::new();
     let hasher_rc = Arc::new(Mutex::new(hasher));
     let etag = {
         let hasher_rc2 = hasher_rc.clone();
-        let reader = tokio::fs::File::open(&path).await?;
         let hashing_reader = InspectReader::new(reader, move |bytes| {
             hasher_rc2.lock().unwrap().update(bytes)
         });
@@ -35,17 +38,17 @@ pub async fn upload_file(
 
     // strip leading and trailing "
     let etag = etag.strip_prefix('"').unwrap_or(&etag);
-    let etag = etag.strip_suffix('"').unwrap_or(&etag);
+    let etag = etag.strip_suffix('"').unwrap_or(etag);
 
     let md5sum = Arc::try_unwrap(hasher_rc)
         .map_err(|_| anyhow!("Lock still has multiple owners!."))?
         .into_inner()?
         .finalize();
+    let md5sum = format!("{:x}", md5sum);
 
-    ensure!(
-        format!("{:x}", md5sum) == etag,
-        "ETAG not like md5sum!"
-    );
+    trace!("uploaded file"; "url" => target_url_string, "md5sum" => &md5sum, "etag" => etag);
+
+    ensure!(md5sum == etag, "ETAG not like md5sum!");
     Ok(())
 }
 
@@ -115,10 +118,8 @@ mod test {
                 rw.write_all(b"Test data\n").await?;
             }
         }
-        let presigned_url = get_presigned_put_url(&bucket, key, presigned_ttl)
-            .await?;
-        let _ = super::upload_file(reqwest_client, tempfile.file_path(), presigned_url)
-            .await?;
+        let presigned_url = get_presigned_put_url(&bucket, key, presigned_ttl).await?;
+        let _ = super::upload_file(reqwest_client, tempfile, presigned_url).await?;
 
         // cleanup
         let _ = remove_bucket_key(&bucket, key).await;
