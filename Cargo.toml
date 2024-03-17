@@ -1,48 +1,51 @@
 [package]
-name = "pdf-generator"
+name = "templater"
 version = "0.1.0"
 authors = ["Tobias Florek <tob@butter.sh>"]
 edition = "2021"
-default-run = "pdf-generator"
+default-run = "templater"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-name = "pdf_generator"
+name = "templater"
 path = "src/lib/mod.rs"
 
 [features]
-default = ["build-cli"]
-build-cli = ["clap", "anyhow"]
-build-axum = ["axum"]
+default = ["cli", "server"]
+cli = ["clap", "anyhow"]
+server = ["axum"]
 
 [[bin]]
-name = "pdf-generator"
+name = "templater"
 path = "src/cli/main.rs"
-required-features = ["build-cli"]
+required-features = ["cli"]
 
 [[bin]]
 name = "serve"
 path = "src/axum/main.rs"
-required-features = ["build-axum"]
+required-features = ["server"]
 
 [dependencies]
 anyhow = { version = "1", optional = true }
-async-stream = "0.3.5"
-axum = { version = "0.7", optional = true }
+async-tempfile = "0.5.0"
+axum = { version = "0.7", optional = true, features = ["json", "macros"] }
 clap = { version = "4", optional = true, features = ["derive"] }
-derive-newtype = "0.2.3"
-futures = "0.3.30"
+foundations = "3.2.2"
 md-5 = "0.10.6"
-mime_guess = "2"
-minijinja = "1.0.10"
+mime_guess = { version = "2.0.4", default-features = false }
+minijinja = { version = "1.0.10", features = ["loader"] }
+nutype = { version = "0.4.0", features = ["serde"] }
 reqwest = { version = "0.11.24", features = ["rustls", "rustls-tls-webpki-roots", "stream"] }
-tokio = { version = "1", features = ["macros", "process", "rt-multi-thread", "tracing"] }
+serde = { version = "1.0.196", features = ["derive"] }
+serde_json = "1.0.114"
+tempfile = "3.10.0" # TODO: to be removed
+tokio = { version = "1", features = ["macros", "process", "rt-multi-thread", "signal"] }
 tokio-util = { version = "0.7.10", features = ["io"] }
-tracing = "0.1.40"
-tracing-subscriber = "0.3"
 
 [dev-dependencies]
 aws-config = { version = "1", features = ["behavior-version-latest"] }
 aws-sdk-s3 = "1"
-async-tempfile = "0.5.0"
+
+[package.metadata.cargo-machete]
+ignored = ["md-5"]

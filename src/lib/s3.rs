@@ -4,12 +4,17 @@ use anyhow::{anyhow, ensure};
 use async_tempfile::TempFile;
 use foundations::telemetry::log::{debug, trace};
 use md5::{Digest, Md5};
-use reqwest::{header::ETAG, IntoUrl};
+use mime_guess::Mime;
+use reqwest::{
+    header::{self, ETAG},
+    IntoUrl,
+};
 use tokio_util::io::{InspectReader, ReaderStream};
 
 pub async fn upload_file(
     client: &reqwest::Client,
     reader: TempFile,
+    mime_type: Mime,
     target_url: impl IntoUrl,
 ) -> anyhow::Result<()> {
     let target_url: reqwest::Url = target_url.into_url()?;
@@ -25,7 +30,11 @@ pub async fn upload_file(
         });
         let stream = ReaderStream::new(hashing_reader);
         let body = reqwest::Body::wrap_stream(stream);
-        let req = client.put(target_url).body(body).build()?;
+        let req = client
+            .put(target_url)
+            .header(header::CONTENT_TYPE, mime_type.as_ref())
+            .body(body)
+            .build()?;
         client
             .execute(req)
             .await?
