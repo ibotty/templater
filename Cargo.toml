@@ -47,5 +47,13 @@ tokio-util = { version = "0.7.10", features = ["io"] }
 aws-config = { version = "1", features = ["behavior-version-latest"] }
 aws-sdk-s3 = "1"
 
+[profile.dev]
+debug = 0
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+
 [package.metadata.cargo-machete]
 ignored = ["md-5"]
