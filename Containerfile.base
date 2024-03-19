@@ -1,0 +1,11 @@
+FROM quay.io/fedora/fedora-minimal:40
+LABEL MAINTAINER "Tobias Florek <tob@butter.sh>"
+LABEL org.opencontainers.image.source "https://github.com/ibotty/templater"
+LABEL org.opencontainers.image.description "Templater base image"
+LABEL org.opencontainers.image.licenses "AGPL-3.0-or-later"
+
+RUN microdnf install -y \
+      texlive-context \
+      texlive-context-letter \
+      texlive-markdown \
+ && microdnf clean all

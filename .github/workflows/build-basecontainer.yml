@@ -1,0 +1,54 @@
+---
+name: Build release
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}-base
+  ARCHS: amd64
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+    - main
+    paths:
+    - Containerfile.base
+
+jobs:
+  build-container:
+    name: Build base container
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+    - name: Check out the repo
+      uses: actions/checkout@v4
+    - name: Log into registry
+      uses: redhat-actions/podman-login@v1
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
+
+    - name: Set up qemu for multi-arch
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y qemu-user-static
+      if: ${{ env.ARCHS != 'amd64' }}
+
+    - name: Build container
+      id: build-image
+      uses: redhat-actions/buildah-build@v2
+      with:
+        image: ${{ env.IMAGE_NAME }}
+        tags: "latest"
+        archs: ${{ env.ARCHS }}
+        oci: true
+        containerfiles: ./Containerfile.base
+
+    - name: push to registry
+      uses: redhat-actions/push-to-registry@v2
+      with:
+        image: ${{ steps.build-image.outputs.image }}
+        tags: ${{ steps.build-image.outputs.tags }}
+        registry: ${{ env.REGISTRY }}
