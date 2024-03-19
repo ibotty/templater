@@ -1,0 +1,5 @@
+FROM ghcr.io/ibotty/templater-base:latest
+
+COPY target/release/templater /
+USER 1001
+ENTRYPOINT ["/templater"]

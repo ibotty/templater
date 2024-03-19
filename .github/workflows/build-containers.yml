@@ -1,0 +1,86 @@
+---
+name: Build release
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  ARCHS: amd64
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+    - main
+
+jobs:
+
+  build:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
+
+    - uses: Swatinem/rust-cache@v2
+
+    - name: Build
+      uses: actions-rs/cargo@v1
+      with:
+        command: build
+        args: --release --all-features
+
+    - name: Log into registry
+      uses: redhat-actions/podman-login@v1
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
+
+    - name: Set up qemu for multi-arch
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y qemu-user-static
+      if: ${{ env.ARCHS != 'amd64' }}
+
+    - name: Build container
+      id: build-image
+      uses: redhat-actions/buildah-build@v2
+      with:
+        image: ${{ env.IMAGE_NAME }}
+        tags: "latest"
+        archs: ${{ env.ARCHS }}
+        oci: true
+        containerfiles: |
+          ./Containerfile.serve
+
+    - name: Build container
+      id: build-cli-image
+      uses: redhat-actions/buildah-build@v2
+      with:
+        image: ${{ env.IMAGE_NAME }}-cli
+        tags: "latest"
+        archs: ${{ env.ARCHS }}
+        oci: true
+        containerfiles: |
+          ./Containerfile.cli
+
+    - name: push to registry
+      uses: redhat-actions/push-to-registry@v2
+      with:
+        image: ${{ steps.build-image.outputs.image }}
+        tags: ${{ steps.build-image.outputs.tags }}
+        registry: ${{ env.REGISTRY }}
+
+    - name: push to registry
+      uses: redhat-actions/push-to-registry@v2
+      with:
+        image: ${{ steps.build-cli-image.outputs.image }}
+        tags: ${{ steps.build-cli-image.outputs.tags }}
+        registry: ${{ env.REGISTRY }}
+
