@@ -21,6 +21,9 @@ struct Cli {
     #[structopt(long, default_value = "examples/templates")]
     templates_path: PathBuf,
 
+    #[structopt(long, default_value = "examples/assets")]
+    assets_path: PathBuf,
+
     #[structopt(short, long)]
     inputs: Vec<InputRef>,
 
@@ -51,7 +54,7 @@ async fn main() -> BootstrapResult<()> {
         output: opts.output,
         template: opts.template,
     };
-    let state = State::new(opts.templates_path);
+    let state = State::new(opts.templates_path, opts.assets_path);
     let renderer = state
         .new_job(renderjob)
         .await

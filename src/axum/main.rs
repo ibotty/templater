@@ -44,8 +44,10 @@ async fn main() -> BootstrapResult<()> {
         log::info!("Telemetry server listening on http://{}", addr);
     }
 
-    let templates_path = env::var("TEMPLATES_PATH")?;
-    let server_state = Arc::new(State::new(templates_path));
+    let templates_path =
+        env::var("TEMPLATES_PATH").unwrap_or("/etc/templater/templates".to_string());
+    let assets_path = env::var("ASSETS_PATH").unwrap_or("/etc/templater/assets".to_string());
+    let server_state = Arc::new(State::new(templates_path, assets_path));
 
     let bind_addr = "0.0.0.0:8080";
 
