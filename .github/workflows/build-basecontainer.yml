@@ -1,5 +1,5 @@
 ---
-name: Build release
+name: Build base container
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}-base
