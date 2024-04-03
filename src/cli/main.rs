@@ -1,4 +1,8 @@
-use std::{collections::HashMap, path::PathBuf, str::FromStr};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 use anyhow::{bail, Context};
 use clap::Parser;
@@ -18,11 +22,11 @@ struct Cli {
     #[structopt(short, long, value_parser = TemplateRef::from_str)]
     template: TemplateRef,
 
-    #[structopt(long, default_value = "examples/templates")]
-    templates_path: PathBuf,
+    #[structopt(long)]
+    templates_path: Option<PathBuf>,
 
-    #[structopt(long, default_value = "examples/assets")]
-    assets_path: PathBuf,
+    #[structopt(long)]
+    assets_path: Option<PathBuf>,
 
     #[structopt(short, long)]
     inputs: Vec<InputRef>,
@@ -41,12 +45,13 @@ async fn main() -> BootstrapResult<()> {
     telemetry::init(&service_info, &telemetry_settings)?;
 
     let opts = Cli::parse();
+
     let log_level =
         Level::from_usize((Level::Warning.as_usize() + opts.verbosity as usize).clamp(0, 5))
             .expect("could not set loglevel");
     log::set_verbosity(log_level).map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
-    debug!("parsed options: {:?}", opts);
+    debug!("parsed cli opts"; "opts" => format!("{:?}", opts));
 
     let mut data = HashMap::new();
     for input in opts.inputs {
@@ -62,12 +67,43 @@ async fn main() -> BootstrapResult<()> {
             };
         data.extend(new_data.into_iter());
     }
+
+    let template_path = Path::new(opts.template.as_ref());
+    let this_template_dir = template_path
+        .canonicalize()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.to_path_buf()));
+
+    let template = TemplateRef::from_str(opts.template.as_ref().rsplit('/').next().unwrap())?;
+
+    let assets_path = opts
+        .assets_path
+        .or_else(|| {
+            this_template_dir
+                .as_ref()
+                .and_then(|dir| dir.parent().map(|p| p.join("assets")))
+        })
+        .unwrap_or_else(|| Path::new("./assets").to_path_buf());
+
+    let templates_path = opts
+        .templates_path
+        .or(this_template_dir)
+        .unwrap_or_else(|| Path::new("./templates").to_path_buf());
+
+    debug!("running with";
+            "templates_path" => templates_path.as_path().display(),
+            "assets_path" => assets_path.as_path().display(),
+            "template" => template.as_ref(),
+    );
+
+    let state = State::new(templates_path, assets_path);
+
     let renderjob = RenderJob {
         data,
         output: opts.output,
-        template: opts.template,
+        template,
     };
-    let state = State::new(opts.templates_path, opts.assets_path);
+
     let renderer = state
         .new_job(renderjob)
         .await
