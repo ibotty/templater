@@ -8,4 +8,15 @@ RUN microdnf install -y \
       texlive-context \
       texlive-context-letter \
       texlive-markdown \
- && microdnf clean all
+ && microdnf clean all \
+ && echo 'default:*:1001:0:container user:/home/default/:/bin/sh' >> /etc/passwd \
+ && echo 'default:x:1001:1001' >> /etc/group \
+ && install -o default -m 0700 -d /home/default
+
+USER 1001
+
+# work around bug that unsuccessfully tries to load socket.core
+RUN HOME=/home/default mtxrun --generate \
+ && echo q | HOME=/home/default context - || true
+
+USER 0
