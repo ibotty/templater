@@ -13,7 +13,7 @@ path = "src/lib/mod.rs"
 
 [features]
 default = ["cli", "server"]
-cli = ["clap", "anyhow"]
+cli = ["anyhow", "clap", "serde_json", "serde_yaml"]
 server = ["axum"]
 
 [[bin]]
@@ -32,13 +32,15 @@ async-tempfile = "0.5.0"
 axum = { version = "0.7", optional = true, features = ["json", "macros"] }
 clap = { version = "4", optional = true, features = ["derive"] }
 foundations = "3.2.2"
+icu_decimal = "1.4.0"
 md-5 = "0.10.6"
 mime_guess = { version = "2.0.4", default-features = false }
 minijinja = { version = "1.0.10", features = ["loader"] }
 nutype = { version = "0.4.0", features = ["serde"] }
-reqwest = { version = "0.11.24", features = ["rustls", "rustls-tls-webpki-roots", "stream"] }
+reqwest = { version = "0.12", features = ["rustls-tls", "rustls-tls-webpki-roots", "stream"] }
 serde = { version = "1.0.196", features = ["derive"] }
-serde_json = "1.0.114"
+serde_json = { version = "1.0.114", optional = true }
+serde_yaml = { version = "0.9", optional = true }
 tempfile = "3.10.0" # TODO: to be removed
 tokio = { version = "1", features = ["macros", "process", "rt-multi-thread", "signal"] }
 tokio-util = { version = "0.7.10", features = ["io"] }

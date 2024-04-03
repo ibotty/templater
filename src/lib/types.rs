@@ -1,4 +1,8 @@
-use std::{collections::HashMap, path::Path, str::FromStr};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 use mime_guess::{mime, Mime, MimeGuess};
 use nutype::nutype;
@@ -38,7 +42,7 @@ impl TemplateRef {
 }
 
 #[nutype(derive(AsRef, From, FromStr, Clone, Debug, Deserialize))]
-pub struct InputRef(String);
+pub struct InputRef(PathBuf);
 
 #[nutype(derive(AsRef, Clone, FromStr, Debug, Deserialize))]
 pub struct OutputRef(FileRef);
