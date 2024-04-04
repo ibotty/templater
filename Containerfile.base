@@ -4,6 +4,11 @@ LABEL org.opencontainers.image.source "https://github.com/ibotty/templater"
 LABEL org.opencontainers.image.description "Templater base image"
 LABEL org.opencontainers.image.licenses "AGPL-3.0-or-later"
 
+WORKDIR /home/default
+
+ENV HOME=/home/default \
+    OSFONTDIR=/etc/templater/fonts
+
 RUN microdnf install -y \
       texlive-context \
       texlive-context-letter \
@@ -17,6 +22,7 @@ USER 1001
 
 # work around bug that unsuccessfully tries to load socket.core
 RUN HOME=/home/default mtxrun --generate \
- && echo q | HOME=/home/default context - || true
+ && echo q | HOME=/home/default context - || true \
+ && chmod -R a+rwX /home/default
 
 USER 0
