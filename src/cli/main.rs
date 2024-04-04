@@ -36,6 +36,9 @@ struct Cli {
 
     #[structopt(short, long, action = clap::ArgAction::Count)]
     verbosity: u8,
+
+    #[structopt(long)]
+    disable_sandboxing: bool,
 }
 
 #[tokio::main]
@@ -109,14 +112,14 @@ async fn main() -> BootstrapResult<()> {
         .await
         .context("Could not create job")?;
 
-    sandbox_syscalls()?;
+    sandbox_syscalls(!opts.disable_sandboxing)?;
 
     renderer.run_job().await.context("Could not run job")?;
     Ok(())
 }
 
 #[cfg(target_os = "linux")]
-fn sandbox_syscalls() -> BootstrapResult<()> {
+fn sandbox_syscalls(enabled: bool) -> BootstrapResult<()> {
     use foundations::security::{common_syscall_allow_lists::*, *};
 
     allow_list! {
@@ -127,6 +130,9 @@ fn sandbox_syscalls() -> BootstrapResult<()> {
             ..ADDITIONAL_REQUIRED_SYSCALLS
         ]
     }
-    enable_syscall_sandboxing(ViolationAction::KillProcess, &ALLOWED)
-    //enable_syscall_sandboxing(ViolationAction::AllowAndLog, &ALLOWED)
+    if enabled {
+        enable_syscall_sandboxing(ViolationAction::KillProcess, &ALLOWED)
+    } else {
+        enable_syscall_sandboxing(ViolationAction::AllowAndLog, &ALLOWED)
+    }
 }
