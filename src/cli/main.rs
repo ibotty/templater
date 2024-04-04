@@ -128,4 +128,5 @@ fn sandbox_syscalls() -> BootstrapResult<()> {
         ]
     }
     enable_syscall_sandboxing(ViolationAction::KillProcess, &ALLOWED)
+    //enable_syscall_sandboxing(ViolationAction::AllowAndLog, &ALLOWED)
 }
