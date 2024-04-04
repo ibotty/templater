@@ -86,7 +86,8 @@ async fn main() -> BootstrapResult<()> {
                 .as_ref()
                 .and_then(|dir| dir.parent().map(|p| p.join("assets")))
         })
-        .unwrap_or_else(|| Path::new("./assets").to_path_buf());
+        .unwrap_or_else(|| Path::new("./assets").to_path_buf())
+        .canonicalize()?;
 
     let templates_path = opts
         .templates_path
