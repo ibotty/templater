@@ -9,6 +9,8 @@ WORKDIR /home/default
 ENV HOME=/home/default \
     OSFONTDIR=/etc/templater/fonts
 
+ADD fonts /etc/templater/fonts
+
 RUN microdnf install -y \
       texlive-context \
       texlive-context-letter \
