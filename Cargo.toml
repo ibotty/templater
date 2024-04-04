@@ -31,8 +31,10 @@ anyhow = { version = "1", optional = true }
 async-tempfile = "0.5.0"
 axum = { version = "0.7", optional = true, features = ["json", "macros"] }
 clap = { version = "4", optional = true, features = ["derive"] }
+fixed_decimal = { version = "0.5.5", features = ["std", "ryu"] }
 foundations = "3.2.2"
-icu_decimal = "1.4.0"
+icu_decimal = { version = "1.4.0", features = ["std"] }
+icu_locid = { version = "1.4.0", features = ["std"] }
 md-5 = "0.10.6"
 mime_guess = { version = "2.0.4", default-features = false }
 minijinja = { version = "1.0.10", features = ["loader"] }

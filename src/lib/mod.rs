@@ -1,3 +1,4 @@
+pub mod filters;
 pub mod s3;
 pub mod types;
 
@@ -31,6 +32,7 @@ impl State {
             "__templates_path",
             templates_path.as_ref().to_str().unwrap(),
         );
+        jinja_env.add_filter("currency_format", filters::currency_format);
         jinja_env.set_loader(minijinja::path_loader(templates_path));
 
         let jinja_env = Arc::new(jinja_env);
