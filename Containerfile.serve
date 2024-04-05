@@ -1,8 +1,10 @@
 FROM ghcr.io/ibotty/templater-base:latest
 ENV TEMPLATES_PATH=/etc/templater/templates
 ENV ASSETS_PATH=/etc/templater/assets
+EXPOSE 8080/tcp
 
 ADD examples/default.config /etc/templater/serve.config
 COPY target/release/serve /
 USER 1001
-ENTRYPOINT ["/serve", "--config", "/etc/templater/serve.config"]
+ENTRYPOINT ["/serve"]
+CMD ["--config", "/etc/templater/serve.config"]
