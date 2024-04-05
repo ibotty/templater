@@ -146,7 +146,10 @@ impl Renderer {
             .current_dir(&self.dir)
             .spawn()
             .context("Could not spawn command")?;
-        let cmd_output = context_proc.wait_with_output().await.context("Could not get command output")?;
+        let cmd_output = context_proc
+            .wait_with_output()
+            .await
+            .context("Could not get command output")?;
         let stdout = String::from_utf8(cmd_output.stdout)?;
         let stderr = String::from_utf8(cmd_output.stderr)?;
         let status = cmd_output.status;

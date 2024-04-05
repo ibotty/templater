@@ -4,9 +4,11 @@ use std::{
     str::FromStr,
 };
 
+use anyhow::{bail, Context, Result};
 use mime_guess::{mime, Mime, MimeGuess};
 use nutype::nutype;
 use reqwest::Url;
+use reqwest::header;
 use serde::Deserialize;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -42,7 +44,7 @@ impl TemplateRef {
 }
 
 #[nutype(derive(AsRef, From, FromStr, Clone, Debug, Deserialize))]
-pub struct InputRef(PathBuf);
+pub struct InputRef(FileRef);
 
 #[nutype(derive(AsRef, Clone, FromStr, Debug, Deserialize))]
 pub struct OutputRef(FileRef);
@@ -52,6 +54,51 @@ pub struct OutputRef(FileRef);
 pub enum FileRef {
     Url(reqwest::Url),
     File(PathBuf),
+}
+
+impl FileRef {
+    pub async fn read(
+        &self,
+        reqwest_client: &reqwest::Client,
+    ) -> Result<HashMap<String, minijinja::Value>> {
+        match self {
+            FileRef::File(filename) => {
+                let bytes = tokio::fs::read(filename)
+                    .await
+                    .with_context(|| format!("Cannot open input file {}", filename.display()))?;
+                let data = match filename.extension().and_then(|s| s.to_str()) {
+                    Some("json") => serde_json::from_slice(&bytes)?,
+                    Some("yaml") => serde_yaml::from_slice(&bytes)?,
+                    _ => bail!("Unsupported input file {}", filename.display()),
+                };
+                Ok(data)
+            }
+            FileRef::Url(url) => {
+                let res = reqwest_client
+                    .get(url.as_ref())
+                    .send()
+                    .await?
+                    .error_for_status()?;
+
+                let content_type = res
+                    .headers()
+                    .get(header::CONTENT_TYPE)
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|v| v.parse::<Mime>().ok())
+                    .unwrap_or(mime::APPLICATION_JSON);
+
+                let bytes = res.bytes().await?;
+
+                // Note: it's not possible to use `mime::JSON`, because `mime::YAML` does not exist
+                let data = match (content_type.type_(), content_type.subtype().as_str()) {
+                    (mime::APPLICATION, "json") => serde_json::from_slice(&bytes)?,
+                    (mime::APPLICATION, "yaml") => serde_yaml::from_slice(&bytes)?,
+                    _ => bail!("Unsupported input file {}", content_type),
+                };
+                Ok(data)
+            }
+        }
+    }
 }
 
 impl From<&str> for FileRef {
@@ -65,7 +112,7 @@ impl FromStr for FileRef {
 
     /// This will parse the parameter and if it resembles a URL (i.e. reqwest can parse it) treat
     /// it as URL, if not as filename.
-    fn from_str(str: &str) -> anyhow::Result<Self> {
+    fn from_str(str: &str) -> Result<Self> {
         Ok(match Url::parse(str) {
             Ok(url) => FileRef::Url(url),
             Err(_) => FileRef::File(Path::new(str).to_path_buf()),

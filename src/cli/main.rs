@@ -4,7 +4,7 @@ use std::{
     str::FromStr,
 };
 
-use anyhow::{bail, Context};
+use anyhow::Context;
 use clap::Parser;
 use foundations::{
     telemetry::{
@@ -57,18 +57,9 @@ async fn main() -> BootstrapResult<()> {
     debug!("parsed cli opts"; "opts" => format!("{:?}", opts));
 
     let mut data = HashMap::new();
+    let reqwest_client = reqwest::Client::new();
     for input in opts.inputs {
-        let filename = input.as_ref();
-        let bytes = tokio::fs::read(filename)
-            .await
-            .with_context(|| format!("Cannot open input file {}", filename.display()))?;
-        let new_data: HashMap<String, minijinja::Value> =
-            match filename.extension().and_then(|s| s.to_str()) {
-                Some("json") => serde_json::from_slice(&bytes)?,
-                Some("yaml") => serde_yaml::from_slice(&bytes)?,
-                _ => bail!("Unsupported input file {}", filename.display()),
-            };
-        data.extend(new_data.into_iter());
+        data.extend(input.as_ref().read(&reqwest_client).await?.into_iter());
     }
 
     let template_path = Path::new(opts.template.as_ref());
