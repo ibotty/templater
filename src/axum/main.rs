@@ -53,6 +53,7 @@ async fn main() -> BootstrapResult<()> {
 
     let app = axum::Router::new()
         .route("/", axum::routing::post(post_renderjob))
+        .route("/_healthz", axum::routing::get(healthz))
         .with_state(server_state);
     let listener = TcpListener::bind(bind_addr).await?;
     let axum_fut = axum::serve(
@@ -92,6 +93,11 @@ async fn shutdown_signal() {
         _ = terminate => {},
     }
     log::info!("signal received, starting graceful shutdown");
+}
+
+#[axum::debug_handler]
+async fn healthz() -> &'static str {
+    "OK\n"
 }
 
 #[axum::debug_handler]
