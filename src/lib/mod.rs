@@ -140,14 +140,18 @@ impl Renderer {
         debug!("trying to compile"; "template-file" => path.to_str(), "output-file" => output_file_path.to_str());
 
         let command = "context";
-        let mut context_proc = Command::new(command)
-            .arg("--noconsole")
+        let context_proc = Command::new(command)
             .arg("--batchmode")
             .arg(path)
             .current_dir(&self.dir)
             .spawn()
             .context("Could not spawn command")?;
-        let status = context_proc.wait().await.context("Could not get status")?;
+        let cmd_output = context_proc.wait_with_output().await.context("Could not get command output")?;
+        let stdout = String::from_utf8(cmd_output.stdout)?;
+        let stderr = String::from_utf8(cmd_output.stderr)?;
+        let status = cmd_output.status;
+
+        debug!("ran pdf compilation"; "status" => status.code(), "stdout" => stdout, "stderr" => stderr);
         ensure!(status.success(), "Could not compile file");
 
         let output_file = TempFile::from_existing(output_file_path, Ownership::Owned)
