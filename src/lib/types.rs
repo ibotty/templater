@@ -51,7 +51,7 @@ pub struct OutputRef(FileRef);
 #[serde(from = "&str")]
 pub enum FileRef {
     Url(reqwest::Url),
-    File(String),
+    File(PathBuf),
 }
 
 impl From<&str> for FileRef {
@@ -68,7 +68,7 @@ impl FromStr for FileRef {
     fn from_str(str: &str) -> anyhow::Result<Self> {
         Ok(match Url::parse(str) {
             Ok(url) => FileRef::Url(url),
-            Err(_) => FileRef::File(str.to_string()),
+            Err(_) => FileRef::File(Path::new(str).to_path_buf()),
         })
     }
 }
