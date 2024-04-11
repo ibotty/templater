@@ -2,6 +2,7 @@ pub mod filters;
 pub mod s3;
 pub mod types;
 
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::OnceLock;
@@ -58,10 +59,12 @@ impl State {
 }
 
 pub struct Renderer {
-    job: RenderJob,
     dir: TempDir,
     reqwest_client: reqwest::Client,
     jinja_env: Arc<Environment<'static>>,
+    template: TemplateRef,
+    output: OutputRef,
+    data: HashMap<String, minijinja::Value>,
 }
 
 impl Renderer {
@@ -72,11 +75,18 @@ impl Renderer {
     ) -> Result<Self> {
         let dir = TempDir::new()?;
 
+        let mut data: HashMap<String, minijinja::Value> = Default::default();
+        for input in job.inputs.into_iter() {
+            data.extend(input.read_into_env(&reqwest_client).await?.into_iter());
+        }
+
         Ok(Self {
-            job,
             dir,
             reqwest_client,
             jinja_env,
+            data,
+            template: job.template,
+            output: job.output,
         })
     }
 
@@ -86,18 +96,18 @@ impl Renderer {
             .await
             .context("Could not create template")?;
 
-        if self.job.template.should_compile() {
+        if self.template.should_compile() {
             output_file = self
                 .compile_pdf(&output_file)
                 .await
                 .context("Could not compile pdf")?;
         }
 
-        match self.job.output.as_ref() {
+        match self.output.as_ref() {
             FileRef::Url(url) => s3::upload_file(
                 &self.reqwest_client,
                 output_file,
-                self.job.template.mime_type(),
+                self.template.mime_type(),
                 url.clone(),
             )
             .await
@@ -113,14 +123,15 @@ impl Renderer {
 
     pub async fn write_template(&self) -> Result<TempFile> {
         let templated_file =
-            TempFile::new_with_name_in(self.job.template.as_ref(), self.dir.path().to_owned())
+            TempFile::new_with_name_in(self.template.as_ref(), self.dir.path().to_owned())
                 .await
                 .context("Could not create template file")?;
+
         let rendered = self
             .jinja_env
-            .get_template(self.job.template.as_ref())
+            .get_template(self.template.as_ref())
             .context("Could not get template")?
-            .render(&self.job.data)
+            .render(&self.data)
             .context("Could not render template")?;
         let mut f = templated_file
             .open_rw()

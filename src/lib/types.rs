@@ -7,18 +7,18 @@ use std::{
 use anyhow::{bail, Context, Result};
 use mime_guess::{mime, Mime, MimeGuess};
 use nutype::nutype;
-use reqwest::Url;
 use reqwest::header;
+use reqwest::Url;
 use serde::Deserialize;
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct RenderJob {
-    pub data: HashMap<String, minijinja::Value>,
     pub template: TemplateRef,
     pub output: OutputRef,
+    pub inputs: Vec<Input>,
 }
 
-#[nutype(derive(AsRef, From, FromStr, Clone, Debug, Deserialize))]
+#[nutype(derive(AsRef, From, FromStr, Clone, Debug, Deserialize, Eq, PartialEq))]
 pub struct TemplateRef(String);
 
 impl TemplateRef {
@@ -43,13 +43,29 @@ impl TemplateRef {
     }
 }
 
-#[nutype(derive(AsRef, From, FromStr, Clone, Debug, Deserialize))]
-pub struct InputRef(FileRef);
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(untagged)]
+pub enum Input {
+    FileRef(FileRef),
+    Inline(HashMap<String, minijinja::Value>),
+}
 
-#[nutype(derive(AsRef, Clone, FromStr, Debug, Deserialize))]
+impl Input {
+    pub async fn read_into_env(
+        self,
+        reqwest_client: &reqwest::Client,
+    ) -> Result<HashMap<String, minijinja::Value>> {
+        match self {
+            Input::FileRef(fileref) => fileref.read_into_env(reqwest_client).await,
+            Input::Inline(v) => Ok(v),
+        }
+    }
+}
+
+#[nutype(derive(AsRef, Clone, FromStr, Debug, Deserialize, Eq, PartialEq))]
 pub struct OutputRef(FileRef);
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(from = "&str")]
 pub enum FileRef {
     Url(reqwest::Url),
@@ -57,7 +73,7 @@ pub enum FileRef {
 }
 
 impl FileRef {
-    pub async fn read(
+    pub async fn read_into_env(
         &self,
         reqwest_client: &reqwest::Client,
     ) -> Result<HashMap<String, minijinja::Value>> {
@@ -127,3 +143,27 @@ impl FromStr for FileRef {
 //        FileRef::from_str(str).map(Self::new)
 //    }
 //}
+
+#[cfg(test)]
+mod test {
+    use std::str::FromStr;
+    use minijinja::Value;
+    use crate::*;
+
+    #[test]
+    fn test_deserialization() {
+        let sample = r#"{
+            "template": "test.j2",
+            "inputs": [{"test": "value"}],
+            "output": "/test/file"
+        }"#;
+        let parsed: RenderJob = serde_json::from_str(sample).unwrap();
+        let renderjob = RenderJob {
+            template: TemplateRef::from("test.j2".to_string()),
+            output: OutputRef::from_str("/test/file").unwrap(),
+            inputs: vec!(Input::Inline(HashMap::from([("test".to_string(), Value::from_serializable(&"value"))]))),
+        };
+        assert_eq!(parsed, renderjob);
+    }
+
+}

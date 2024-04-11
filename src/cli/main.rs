@@ -1,8 +1,5 @@
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use anyhow::Context;
 use clap::Parser;
@@ -29,7 +26,7 @@ struct Cli {
     assets_path: Option<PathBuf>,
 
     #[structopt(short, long)]
-    inputs: Vec<InputRef>,
+    inputs: Vec<FileRef>,
 
     #[structopt(short, long, value_parser = OutputRef::from_str)]
     output: OutputRef,
@@ -55,12 +52,6 @@ async fn main() -> BootstrapResult<()> {
     log::set_verbosity(log_level).map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
     debug!("parsed cli opts"; "opts" => format!("{:?}", opts));
-
-    let mut data = HashMap::new();
-    let reqwest_client = reqwest::Client::new();
-    for input in opts.inputs {
-        data.extend(input.as_ref().read(&reqwest_client).await?.into_iter());
-    }
 
     let template_path = Path::new(opts.template.as_ref());
     let this_template_dir = template_path
@@ -92,11 +83,12 @@ async fn main() -> BootstrapResult<()> {
     );
 
     let state = State::new(templates_path, assets_path);
+    let inputs = opts.inputs.into_iter().map(types::Input::FileRef).collect();
 
     let renderjob = RenderJob {
-        data,
         output: opts.output,
         template,
+        inputs,
     };
 
     let renderer = state
