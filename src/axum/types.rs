@@ -8,13 +8,19 @@ use foundations::telemetry::log;
 use serde::{Deserialize, Serialize};
 use templater::State;
 
-pub type ServerState = Arc<State>;
+#[derive(Clone)]
+pub struct ServerState {
+    pub templater_state: Arc<State>,
+    pub may_output_file: bool,
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct RenderResponse {}
 
+#[derive(Debug)]
 pub enum AppError {
     AnyError(anyhow::Error),
+    NotAllowedOutput,
 }
 
 impl IntoResponse for AppError {
@@ -24,16 +30,17 @@ impl IntoResponse for AppError {
                 log::error!("{:?}", e);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong.")
             }
+            Self::NotAllowedOutput => {
+                log::error!("Output into file not allowed.");
+                (StatusCode::BAD_REQUEST, "Invalid output.")
+            }
         }
         .into_response()
     }
 }
 
-impl<E> From<E> for AppError
-where
-    E: Into<anyhow::Error>,
-{
-    fn from(err: E) -> Self {
-        Self::AnyError(err.into())
+impl From<anyhow::Error> for AppError {
+    fn from(e: anyhow::Error) -> Self {
+        AppError::AnyError(e)
     }
 }

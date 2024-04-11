@@ -146,9 +146,9 @@ impl FromStr for FileRef {
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
-    use minijinja::Value;
     use crate::*;
+    use minijinja::Value;
+    use std::str::FromStr;
 
     #[test]
     fn test_deserialization() {
@@ -161,9 +161,11 @@ mod test {
         let renderjob = RenderJob {
             template: TemplateRef::from("test.j2".to_string()),
             output: OutputRef::from_str("/test/file").unwrap(),
-            inputs: vec!(Input::Inline(HashMap::from([("test".to_string(), Value::from_serializable(&"value"))]))),
+            inputs: vec![Input::Inline(HashMap::from([(
+                "test".to_string(),
+                Value::from_serializable(&"value"),
+            )]))],
         };
         assert_eq!(parsed, renderjob);
     }
-
 }

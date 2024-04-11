@@ -5,19 +5,16 @@ use std::future::IntoFuture;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use axum::{
-    extract::{self, ConnectInfo},
-    Json,
+use axum::extract::{self, ConnectInfo};
+use axum::response::IntoResponse;
+use axum::Json;
+use foundations::cli::{Arg, ArgAction, Cli};
+use foundations::telemetry::{
+    self,
+    log::{self, trace},
+    settings::TelemetrySettings,
 };
-use foundations::{
-    cli::{Arg, ArgAction, Cli},
-    telemetry::{
-        self,
-        log::{self, trace},
-        settings::TelemetrySettings,
-    },
-    BootstrapResult,
-};
+use foundations::BootstrapResult;
 use tokio::net::TcpListener;
 use tokio::signal::unix;
 
@@ -44,10 +41,14 @@ async fn main() -> BootstrapResult<()> {
         log::info!("Telemetry server listening on http://{}", addr);
     }
 
-    let templates_path =
-        env::var("TEMPLATES_PATH").unwrap_or("./templates".to_string());
+    let templates_path = env::var("TEMPLATES_PATH").unwrap_or("./templates".to_string());
     let assets_path = env::var("ASSETS_PATH").unwrap_or("./assets".to_string());
-    let server_state = Arc::new(State::new(templates_path, assets_path));
+    let templater_state = Arc::new(State::new(templates_path, assets_path));
+    let may_output_file = env::var("MAY_OUTPUT_TO_FILE").is_ok();
+    let server_state = ServerState {
+        templater_state,
+        may_output_file,
+    };
 
     let bind_addr = "0.0.0.0:8080";
 
@@ -105,10 +106,16 @@ async fn post_renderjob(
     state: axum::extract::State<ServerState>,
     ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
     extract::Json(renderjob): extract::Json<RenderJob>,
-) -> Result<Json<RenderResponse>, AppError> {
+) -> Result<impl IntoResponse, AppError> {
     trace!("got request"; "client-ip" => format!("{}", client_addr.ip()));
 
-    let renderer = state.new_job(renderjob).await?;
+    if !state.may_output_file {
+        if let FileRef::File(_file) = renderjob.output.as_ref() {
+            return Err(AppError::NotAllowedOutput);
+        }
+    }
+
+    let renderer = state.templater_state.new_job(renderjob).await?;
     renderer.run_job().await?;
     let response = RenderResponse {};
     Ok(Json(response))
