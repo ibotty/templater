@@ -24,6 +24,6 @@ pub fn currency_format(value: f64, lang: Value) -> String {
 }
 
 /// This filter is just a small wrapper around str::split
-pub fn split<'a, 'p>(input: &'a str, pat: &'p str) -> Vec<String> {
+pub fn split(input: &str, pat: &str) -> Vec<String> {
     input.split(pat).map(str::to_string).collect()
 }
