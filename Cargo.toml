@@ -37,7 +37,7 @@ icu_decimal = { version = "1.4.0", features = ["std"] }
 icu_locid = { version = "1.4.0", features = ["std"] }
 md-5 = "0.10.6"
 mime_guess = { version = "2.0.4", default-features = false }
-minijinja = { version = "1.0.10", features = ["loader"] }
+minijinja = { version = "1.0.10", features = ["builtins", "json", "loader", "macros"] }
 nutype = { version = "0.4.0", features = ["serde"] }
 reqwest = { version = "0.12", features = ["rustls-tls", "rustls-tls-webpki-roots", "stream"] }
 serde = { version = "1.0.196", features = ["derive"] }

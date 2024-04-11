@@ -33,6 +33,7 @@ impl State {
             templates_path.as_ref().to_str().unwrap(),
         );
         jinja_env.add_filter("currency_format", filters::currency_format);
+        jinja_env.add_filter("split", filters::split);
         jinja_env.set_loader(minijinja::path_loader(templates_path));
 
         let jinja_env = Arc::new(jinja_env);
