@@ -21,7 +21,7 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         match self {
             Self::AnyError(e) => {
-                log::error!("{}", e);
+                log::error!("{:?}", e);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong.")
             }
         }
