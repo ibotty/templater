@@ -10,6 +10,7 @@ use nutype::nutype;
 use reqwest::header;
 use reqwest::Url;
 use serde::Deserialize;
+use tokio::io::{stdin, AsyncReadExt, BufReader};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct RenderJob {
@@ -79,15 +80,25 @@ impl FileRef {
     ) -> Result<HashMap<String, minijinja::Value>> {
         match self {
             FileRef::File(filename) => {
-                let bytes = tokio::fs::read(filename)
-                    .await
-                    .with_context(|| format!("Cannot open input file {}", filename.display()))?;
-                let data = match filename.extension().and_then(|s| s.to_str()) {
-                    Some("json") => serde_json::from_slice(&bytes)?,
-                    Some("yaml") => serde_yaml::from_slice(&bytes)?,
-                    _ => bail!("Unsupported input file {}", filename.display()),
-                };
-                Ok(data)
+                if filename.as_os_str() == "-" {
+                    let mut reader = BufReader::new(stdin());
+                    let mut bytes = vec![];
+                    reader
+                        .read_to_end(&mut bytes)
+                        .await
+                        .context("Cannot read from stdin")?;
+                    Ok(serde_json::from_slice(&bytes)?)
+                } else {
+                    let bytes = tokio::fs::read(filename).await.with_context(|| {
+                        format!("Cannot open input file {}", filename.display())
+                    })?;
+                    let data = match filename.extension().and_then(|s| s.to_str()) {
+                        Some("json") => serde_json::from_slice(&bytes)?,
+                        Some("yaml") => serde_yaml::from_slice(&bytes)?,
+                        _ => bail!("Unsupported input file {}", filename.display()),
+                    };
+                    Ok(data)
+                }
             }
             FileRef::Url(url) => {
                 let res = reqwest_client
