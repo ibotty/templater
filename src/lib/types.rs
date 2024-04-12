@@ -63,8 +63,18 @@ impl Input {
     }
 }
 
-#[nutype(derive(AsRef, Clone, FromStr, Debug, Deserialize, Eq, PartialEq))]
-pub struct OutputRef(FileRef);
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+pub enum OutputRef {
+    File(FileRef),
+}
+
+impl FromStr for OutputRef {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        FileRef::from_str(s).map(Self::File)
+    }
+}
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(from = "&str")]
@@ -146,14 +156,6 @@ impl FromStr for FileRef {
         })
     }
 }
-
-//impl FromStr for OutputRef {
-//    type Err = anyhow::Error;
-//
-//    fn from_str(str: &str) -> anyhow::Result<Self> {
-//        FileRef::from_str(str).map(Self::new)
-//    }
-//}
 
 #[cfg(test)]
 mod test {

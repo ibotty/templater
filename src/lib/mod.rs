@@ -106,13 +106,13 @@ impl Renderer {
         }
         let mime_type = self.template.mime_type();
 
-        match self.output.as_ref() {
-            FileRef::Url(url) => {
+        match &self.output {
+            OutputRef::File(FileRef::Url(url)) => {
                 s3::upload_file(&self.reqwest_client, output_file, mime_type, url.clone())
                     .await
                     .context("Could not upload file")?
             }
-            FileRef::File(filename) => {
+            OutputRef::File(FileRef::File(filename)) => {
                 if filename.as_os_str() == "-" {
                     let mut buf: [u8; 64] = [0; 64];
                     let mut stdout = io::stdout();
