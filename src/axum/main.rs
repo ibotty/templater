@@ -6,7 +6,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::extract::{self, ConnectInfo};
-use axum::response::IntoResponse;
+use axum::response::{self, IntoResponse};
 use axum::Json;
 use foundations::cli::{Arg, ArgAction, Cli};
 use foundations::telemetry::{
@@ -15,6 +15,7 @@ use foundations::telemetry::{
     settings::TelemetrySettings,
 };
 use foundations::BootstrapResult;
+use reqwest::header;
 use tokio::net::TcpListener;
 use tokio::signal::unix;
 
@@ -116,9 +117,23 @@ async fn post_renderjob(
     }
 
     let renderer = state.templater_state.new_job(renderjob).await?;
-    renderer.run_job().await?;
-    let response = RenderResponse {};
-    Ok(Json(response))
+    match renderer.run_job().await? {
+        None => {
+            let response = RenderResponse {};
+            Ok(Json(response).into_response())
+        }
+        Some(output) => {
+            let headers = [
+                (header::CONTENT_TYPE, output.mime_type.essence_str()),
+                (
+                    header::CONTENT_DISPOSITION,
+                    "attachment; filename=\"Cargo.toml\"",
+                ),
+            ];
+
+            Ok((headers, bytes).into_response())
+        }
+    }
 }
 
 #[cfg(target_os = "linux")]

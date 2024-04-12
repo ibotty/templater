@@ -92,7 +92,7 @@ impl Renderer {
         })
     }
 
-    pub async fn run_job(&self) -> Result<()> {
+    pub async fn run_job(&self) -> Result<Option<Vec<u8>>> {
         let mut output_file = self
             .write_template()
             .await
@@ -136,7 +136,7 @@ impl Renderer {
                 }
             }
         }
-        Ok(())
+        Ok(None)
     }
 
     pub async fn write_template(&self) -> Result<TempFile> {
