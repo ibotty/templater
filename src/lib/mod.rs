@@ -28,9 +28,12 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(templates_path: impl AsRef<Path>, assets_path: impl AsRef<Path>) -> Self {
+    pub fn new(templates_path: impl AsRef<Path>, assets_path: Option<impl AsRef<Path>>) -> Self {
         let mut jinja_env = Environment::new();
-        jinja_env.add_global("__assets_path", assets_path.as_ref().to_str().unwrap());
+        if let Some(assets_path) = assets_path {
+            jinja_env.add_global("__assets_path", assets_path.as_ref().to_str().unwrap());
+        }
+
         jinja_env.add_global(
             "__templates_path",
             templates_path.as_ref().to_str().unwrap(),
