@@ -92,7 +92,7 @@ impl Renderer {
         })
     }
 
-    pub async fn run_job(&self) -> Result<Option<Vec<u8>>> {
+    pub async fn run_job(&self) -> Result<Option<OutputBuffer>> {
         let mut output_file = self
             .write_template()
             .await
@@ -138,12 +138,26 @@ impl Renderer {
                 Ok(None)
             }
             OutputRef::Buffer => {
-                let mut buf = vec![];
+                // unwrap is safe, because it's no directory
+                let filename = output_file
+                    .file_path()
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string();
+
+                let mut buffer = vec![];
                 output_file
-                    .read_to_end(&mut buf)
+                    .read_to_end(&mut buffer)
                     .await
                     .context("Could not read from file")?;
-                Ok(Some(buf))
+
+                Ok(Some(OutputBuffer {
+                    buffer,
+                    filename,
+                    mime_type,
+                }))
             }
         }
     }

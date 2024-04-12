@@ -15,7 +15,6 @@ use foundations::telemetry::{
     settings::TelemetrySettings,
 };
 use foundations::BootstrapResult;
-use mime_guess::mime;
 use reqwest::header;
 use tokio::net::TcpListener;
 use tokio::signal::unix;
@@ -125,15 +124,17 @@ async fn post_renderjob(
         }
         Some(output) => {
             let headers = [
-                (header::CONTENT_TYPE, mime::APPLICATION_PDF.essence_str()),
-                //(header::CONTENT_TYPE, output.mime_type.essence_str()),
-                //(
-                //    header::CONTENT_DISPOSITION,
-                //    "attachment; filename=\"Cargo.toml\"",
-                //),
+                (
+                    header::CONTENT_TYPE,
+                    output.mime_type.essence_str().to_string(),
+                ),
+                (
+                    header::CONTENT_DISPOSITION,
+                    format!("attachment; filename=\"{}\"", output.filename),
+                ),
             ];
 
-            Ok((headers, output).into_response())
+            Ok((headers, output.buffer).into_response())
         }
     }
 }

@@ -1,8 +1,6 @@
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use anyhow::{bail, Context, Result};
 use mime_guess::{mime, Mime, MimeGuess};
@@ -39,10 +37,21 @@ impl TemplateRef {
     }
 
     pub fn mime_type(&self) -> Mime {
-        self.extension()
-            .and_then(|ext| MimeGuess::from_ext(ext).first())
-            .unwrap_or(mime::TEXT_PLAIN)
+        if self.should_compile() {
+            mime::APPLICATION_PDF
+        } else {
+            self.extension()
+                .and_then(|ext| MimeGuess::from_ext(ext).first())
+                .unwrap_or(mime::TEXT_PLAIN)
+        }
     }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct OutputBuffer {
+    pub buffer: Vec<u8>,
+    pub filename: String,
+    pub mime_type: Mime,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
