@@ -110,7 +110,8 @@ impl Renderer {
             OutputRef::File(FileRef::Url(url)) => {
                 s3::upload_file(&self.reqwest_client, output_file, mime_type, url.clone())
                     .await
-                    .context("Could not upload file")?
+                    .context("Could not upload file")?;
+                Ok(None)
             }
             OutputRef::File(FileRef::File(filename)) => {
                 if filename.as_os_str() == "-" {
@@ -134,9 +135,17 @@ impl Renderer {
                         .await
                         .context("Could not copy file")?;
                 }
+                Ok(None)
+            }
+            OutputRef::Buffer => {
+                let mut buf = vec![];
+                output_file
+                    .read_to_end(&mut buf)
+                    .await
+                    .context("Could not read from file")?;
+                Ok(Some(buf))
             }
         }
-        Ok(None)
     }
 
     pub async fn write_template(&self) -> Result<TempFile> {

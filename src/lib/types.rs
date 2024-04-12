@@ -15,6 +15,7 @@ use tokio::io::{stdin, AsyncReadExt, BufReader};
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct RenderJob {
     pub template: TemplateRef,
+    #[serde(default)]
     pub output: OutputRef,
     pub inputs: Vec<Input>,
 }
@@ -64,8 +65,16 @@ impl Input {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(untagged)]
 pub enum OutputRef {
     File(FileRef),
+    Buffer,
+}
+
+impl Default for OutputRef {
+    fn default() -> Self {
+        Self::Buffer
+    }
 }
 
 impl FromStr for OutputRef {

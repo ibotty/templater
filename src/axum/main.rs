@@ -6,7 +6,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::extract::{self, ConnectInfo};
-use axum::response::{self, IntoResponse};
+use axum::response::IntoResponse;
 use axum::Json;
 use foundations::cli::{Arg, ArgAction, Cli};
 use foundations::telemetry::{
@@ -15,6 +15,7 @@ use foundations::telemetry::{
     settings::TelemetrySettings,
 };
 use foundations::BootstrapResult;
+use mime_guess::mime;
 use reqwest::header;
 use tokio::net::TcpListener;
 use tokio::signal::unix;
@@ -111,7 +112,7 @@ async fn post_renderjob(
     trace!("got request"; "client-ip" => format!("{}", client_addr.ip()));
 
     if !state.may_output_file {
-        if let FileRef::File(_file) = renderjob.output.as_ref() {
+        if let OutputRef::File(FileRef::File(_file)) = renderjob.output {
             return Err(AppError::NotAllowedOutput);
         }
     }
@@ -124,14 +125,15 @@ async fn post_renderjob(
         }
         Some(output) => {
             let headers = [
-                (header::CONTENT_TYPE, output.mime_type.essence_str()),
-                (
-                    header::CONTENT_DISPOSITION,
-                    "attachment; filename=\"Cargo.toml\"",
-                ),
+                (header::CONTENT_TYPE, mime::APPLICATION_PDF.essence_str()),
+                //(header::CONTENT_TYPE, output.mime_type.essence_str()),
+                //(
+                //    header::CONTENT_DISPOSITION,
+                //    "attachment; filename=\"Cargo.toml\"",
+                //),
             ];
 
-            Ok((headers, bytes).into_response())
+            Ok((headers, output).into_response())
         }
     }
 }
