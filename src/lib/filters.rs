@@ -27,3 +27,20 @@ pub fn currency_format(value: f64, lang: Value) -> String {
 pub fn split(input: &str, pat: &str) -> Vec<String> {
     input.split(pat).map(str::to_string).collect()
 }
+
+/// This will tex-escape all characters but `\`.
+pub fn context_escape(input: &str) -> String {
+    input
+    .replace('{', "\\{")
+    .replace('}', "\\}")
+    .replace('#', "\\letterhash{}")
+    .replace('$', "\\letterdollar{}")
+    .replace('%', "\\letterpercent{}")
+    .replace('&', "\\letterampersant{}")
+    .replace('_', "\\letterunderscore{}")
+    .replace('[', "\\letterleftbracket{}")
+    .replace(']', "\\letterrightbracket{}")
+    .replace('|', "\\letterbar{}")
+    .replace('~', "\\lettertilde{}")
+    .replace('^', "\\letterhat{}")
+}
