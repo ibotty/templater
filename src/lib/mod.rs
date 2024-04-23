@@ -10,7 +10,6 @@ use std::sync::OnceLock;
 use anyhow::Context;
 use foundations::security::common_syscall_allow_lists::*;
 use foundations::telemetry::log::debug;
-use minijinja::Environment;
 use tokio::fs;
 use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
@@ -24,12 +23,15 @@ pub use types::*;
 #[derive(Debug)]
 pub struct State {
     reqwest_client: OnceLock<reqwest::Client>,
-    jinja_env: Arc<Environment<'static>>,
+    jinja_env: Arc<minijinja::Environment<'static>>,
 }
 
 impl State {
     pub fn new(templates_path: impl AsRef<Path>, assets_path: Option<impl AsRef<Path>>) -> Self {
-        let mut jinja_env = Environment::new();
+        let mut jinja_env = minijinja::Environment::new();
+
+        jinja_env.set_undefined_behavior(minijinja::UndefinedBehavior::Strict);
+
         if let Some(assets_path) = assets_path {
             jinja_env.add_global("__assets_path", assets_path.as_ref().to_str().unwrap());
         }
@@ -67,7 +69,7 @@ impl State {
 pub struct Renderer {
     dir: TempDir,
     reqwest_client: reqwest::Client,
-    jinja_env: Arc<Environment<'static>>,
+    jinja_env: Arc<minijinja::Environment<'static>>,
     template: TemplateRef,
     output: OutputRef,
     data: HashMap<String, minijinja::Value>,
@@ -76,7 +78,7 @@ pub struct Renderer {
 impl Renderer {
     pub async fn setup<'a>(
         reqwest_client: reqwest::Client,
-        jinja_env: Arc<Environment<'static>>,
+        jinja_env: Arc<minijinja::Environment<'static>>,
         job: RenderJob,
     ) -> Result<Self> {
         let dir = TempDir::new()?;
