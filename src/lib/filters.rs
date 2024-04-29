@@ -4,7 +4,9 @@ use icu_locid::locale;
 use minijinja::Value;
 
 /// This filter will format the number with thousand separators and two decimal places.
-pub fn currency_format(value: f64, lang: Value) -> String {
+pub fn currency_format(value: f64, lang: Value, magnitude: Option<u8>) -> String {
+    let magnitude = magnitude.unwrap_or(2) as i16;
+
     let locale = match lang.as_str() {
         Some("de") => locale!("de-DE"),
         Some("en") => locale!("en-US"),
@@ -17,7 +19,7 @@ pub fn currency_format(value: f64, lang: Value) -> String {
     // this caps the number to `.XX`!
     // note, that using FloatPrecision::Floating ("infinite" precision) will misformat e.g.
     // `0.00` as `0`, which is not what's expected.
-    let fixed_decimal = FixedDecimal::try_from_f64(value, FloatPrecision::Magnitude(-2))
+    let fixed_decimal = FixedDecimal::try_from_f64(value, FloatPrecision::Magnitude(-1 * magnitude))
         .expect("cannot get decimal from float");
 
     fdf.format_to_string(&fixed_decimal)
