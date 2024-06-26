@@ -44,7 +44,9 @@ async fn main() -> BootstrapResult<()> {
     }
 
     let templates_path = env::var("TEMPLATES_PATH").unwrap_or("./templates".to_string());
-    let assets_path = Path::new(&env::var("ASSETS_PATH").unwrap_or("./assets".to_string())).canonicalize().ok();
+    let assets_path = Path::new(&env::var("ASSETS_PATH").unwrap_or("./assets".to_string()))
+        .canonicalize()
+        .ok();
     let templater_state = Arc::new(State::new(templates_path, assets_path));
     let may_output_file = env::var("MAY_OUTPUT_TO_FILE").is_ok();
     let server_state = ServerState {

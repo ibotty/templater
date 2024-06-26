@@ -208,8 +208,14 @@ impl Renderer {
         let status = context_proc.status;
 
         debug!("ran pdf compilation"; "status" => status.code());
-        debug!("stdout: {:?}", String::from_utf8_lossy(&context_proc.stdout));
-        debug!("stderr: {:?}", String::from_utf8_lossy(&context_proc.stderr));
+        debug!(
+            "stdout: {:?}",
+            String::from_utf8_lossy(&context_proc.stdout)
+        );
+        debug!(
+            "stderr: {:?}",
+            String::from_utf8_lossy(&context_proc.stderr)
+        );
 
         ensure!(status.success(), "Could not compile file");
 
