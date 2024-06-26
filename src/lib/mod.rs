@@ -15,8 +15,7 @@ use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
 
 use anyhow::{ensure, Result};
-use async_tempfile::{Ownership, TempFile};
-use tempfile::TempDir;
+use async_tempfile::{Ownership, TempDir, TempFile};
 
 pub use types::*;
 
@@ -81,7 +80,7 @@ impl Renderer {
         jinja_env: Arc<minijinja::Environment<'static>>,
         job: RenderJob,
     ) -> Result<Self> {
-        let dir = TempDir::new()?;
+        let dir = TempDir::new().await?;
 
         let mut data: HashMap<String, minijinja::Value> = Default::default();
         for input in job.inputs.into_iter() {
@@ -170,7 +169,7 @@ impl Renderer {
 
     pub async fn write_template(&self) -> Result<TempFile> {
         let templated_file =
-            TempFile::new_with_name_in(self.template.as_ref(), self.dir.path().to_owned())
+            TempFile::new_with_name_in(self.template.as_ref(), self.dir.dir_path().to_owned())
                 .await
                 .context("Could not create template file")?;
 
