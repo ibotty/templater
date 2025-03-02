@@ -6,8 +6,8 @@ use foundations::telemetry::log::{debug, trace};
 use md5::{Digest, Md5};
 use mime_guess::Mime;
 use reqwest::{
-    header::{self, ETAG},
     IntoUrl,
+    header::{self, ETAG},
 };
 use tokio_util::io::{InspectReader, ReaderStream};
 
@@ -23,27 +23,26 @@ pub async fn upload_file(
 
     let hasher = Md5::new();
     let hasher_rc = Arc::new(Mutex::new(hasher));
-    let etag = {
-        let hasher_rc2 = hasher_rc.clone();
-        let hashing_reader = InspectReader::new(reader, move |bytes| {
-            hasher_rc2.lock().unwrap().update(bytes)
-        });
-        let stream = ReaderStream::new(hashing_reader);
-        let body = reqwest::Body::wrap_stream(stream);
-        let req = client
-            .put(target_url)
-            .header(header::CONTENT_TYPE, mime_type.as_ref())
-            .body(body)
-            .build()?;
-        client
-            .execute(req)
-            .await?
-            .headers()
-            .get(ETAG)
-            .ok_or(anyhow!("ETAG header not found"))?
-            .to_str()?
-    }
-    .to_owned();
+
+    let hasher_rc2 = hasher_rc.clone();
+    let hashing_reader = InspectReader::new(reader, move |bytes| {
+        hasher_rc2.lock().unwrap().update(bytes)
+    });
+    let stream = ReaderStream::new(hashing_reader);
+    let body = reqwest::Body::wrap_stream(stream);
+    let req = client
+        .put(target_url)
+        .header(header::CONTENT_TYPE, mime_type.as_ref())
+        .body(body)
+        .build()?;
+    let etag = client
+        .execute(req)
+        .await?
+        .headers()
+        .get(ETAG)
+        .ok_or(anyhow!("ETAG header not found"))?
+        .to_str()?
+        .to_owned();
 
     // strip leading and trailing "
     let etag = etag.strip_prefix('"').unwrap_or(&etag);
