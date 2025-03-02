@@ -28,8 +28,7 @@ required-features = ["server"]
 
 [dependencies]
 anyhow = "1"
-# async-tempfile = "0.5.0"
-async-tempfile = { git = "https://github.com/sunsided/async-tempfile-rs.git", branch = "main" }
+async-tempfile = "0.7.0"
 axum = { version = "0.7", optional = true, features = ["json", "macros"] }
 clap = { version = "4", optional = true, features = ["derive"] }
 fixed_decimal = { version = "0.5.5", features = ["std", "ryu"] }
