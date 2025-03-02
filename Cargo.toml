@@ -29,7 +29,7 @@ required-features = ["server"]
 [dependencies]
 anyhow = "1"
 async-tempfile = "0.7.0"
-axum = { version = "0.7", optional = true, features = ["json", "macros"] }
+axum = { version = "0.8", optional = true, features = ["json", "macros"] }
 clap = { version = "4", optional = true, features = ["derive"] }
 fixed_decimal = { version = "0.5", features = ["ryu"] }
 foundations = "3.2.2"
