@@ -32,7 +32,7 @@ async-tempfile = "0.7.0"
 axum = { version = "0.8", optional = true, features = ["json", "macros"] }
 clap = { version = "4", optional = true, features = ["derive"] }
 fixed_decimal = { version = "0.5", features = ["ryu"] }
-foundations = "3.2.2"
+foundations = "4"
 icu_decimal = { version = "1.5.0", features = ["std"] }
 icu_locid = { version = "1.5.0", features = ["std"] }
 md-5 = "0.10.6"

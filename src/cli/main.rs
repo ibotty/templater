@@ -3,6 +3,7 @@ use std::str::FromStr;
 
 use anyhow::Context;
 use clap::Parser;
+use foundations::telemetry::TelemetryConfig;
 use foundations::{
     telemetry::{
         self,
@@ -42,14 +43,19 @@ struct Cli {
 async fn main() -> BootstrapResult<()> {
     let service_info = foundations::service_info!();
     let telemetry_settings = TelemetrySettings::default();
-    telemetry::init(&service_info, &telemetry_settings)?;
+    let telementry_config = TelemetryConfig {
+        service_info: &service_info,
+        settings: &telemetry_settings,
+        custom_server_routes: vec![],
+    };
+    telemetry::init(telementry_config)?;
 
     let opts = Cli::parse();
 
     let log_level =
         Level::from_usize((Level::Warning.as_usize() + opts.verbosity as usize).clamp(0, 5))
             .expect("could not set loglevel");
-    log::set_verbosity(log_level).map_err(|e| anyhow::anyhow!("{:?}", e))?;
+    log::set_verbosity(log_level.into()).map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
     debug!("parsed cli opts"; "opts" => format!("{:?}", opts));
 

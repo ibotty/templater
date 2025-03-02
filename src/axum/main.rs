@@ -10,6 +10,7 @@ use axum::extract::{self, ConnectInfo};
 use axum::response::IntoResponse;
 use axum::Json;
 use foundations::cli::{Arg, ArgAction, Cli};
+use foundations::telemetry::TelemetryConfig;
 use foundations::telemetry::{
     self,
     log::{self, trace},
@@ -38,7 +39,11 @@ async fn main() -> BootstrapResult<()> {
         return Ok(());
     }
 
-    let telemetry_fut = telemetry::init_with_server(&service_info, &cli.settings, vec![])?;
+    let telemetry_fut = telemetry::init(TelemetryConfig {
+        service_info: &service_info,
+        settings: &cli.settings,
+        custom_server_routes: vec![],
+    })?;
     if let Some(addr) = telemetry_fut.server_addr() {
         log::info!("Telemetry server listening on http://{}", addr);
     }
