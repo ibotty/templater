@@ -75,7 +75,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub async fn setup<'a>(
+    pub async fn setup(
         reqwest_client: reqwest::Client,
         jinja_env: Arc<minijinja::Environment<'static>>,
         job: RenderJob,
