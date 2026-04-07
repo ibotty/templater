@@ -1,6 +1,6 @@
-use fixed_decimal::{FixedDecimal, FloatPrecision};
-use icu_decimal::FixedDecimalFormatter;
-use icu_locid::locale;
+use icu_decimal::input::{Decimal, FloatPrecision};
+use icu_decimal::DecimalFormatter;
+use icu_locale_core::locale;
 use minijinja::Value;
 
 /// This filter will format the number with thousand separators and two decimal places.
@@ -13,13 +13,13 @@ pub fn currency_format(value: f64, lang: Value, magnitude: Option<u8>) -> String
         _ => locale!("en-US"),
     };
 
-    let fdf = FixedDecimalFormatter::try_new(&locale.into(), Default::default())
+    let fdf = DecimalFormatter::try_new(locale.into(), Default::default())
         .expect("locale should be present");
 
     // this caps the number to `.XX`!
     // note, that using FloatPrecision::Floating ("infinite" precision) will misformat e.g.
     // `0.00` as `0`, which is not what's expected.
-    let fixed_decimal = FixedDecimal::try_from_f64(value, FloatPrecision::Magnitude(-magnitude))
+    let fixed_decimal = Decimal::try_from_f64(value, FloatPrecision::Magnitude(-magnitude))
         .expect("cannot get decimal from float");
 
     fdf.format_to_string(&fixed_decimal)
