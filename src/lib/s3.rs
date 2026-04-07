@@ -52,7 +52,7 @@ pub async fn upload_file(
         .map_err(|_| anyhow!("Lock still has multiple owners!."))?
         .into_inner()?
         .finalize();
-    let md5sum = format!("{:x}", md5sum);
+    let md5sum = hex::encode(md5sum);
 
     trace!("uploaded file"; "url" => target_url_string, "md5sum" => &md5sum, "etag" => etag);
 
