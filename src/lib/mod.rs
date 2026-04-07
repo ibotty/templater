@@ -230,6 +230,7 @@ impl Renderer {
 foundations::security::allow_list! {
     pub static ADDITIONAL_REQUIRED_SYSCALLS = [
         ..ASYNC,
+        ..RUST_BASICS,
         ..SERVICE_BASICS,
         access,
         arch_prctl,
@@ -248,6 +249,9 @@ foundations::security::allow_list! {
         getgid,
         getpgrp,
         getppid,
+        getresgid,
+        getresuid,
+        gettimeofday,
         getuid,
         openat,
         pidfd_open,

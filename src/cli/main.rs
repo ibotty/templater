@@ -124,6 +124,7 @@ fn sandbox_syscalls(enabled: bool) -> BootstrapResult<()> {
     if enabled {
         enable_syscall_sandboxing(ViolationAction::KillProcess, &ALLOWED)
     } else {
+        // sysctl -n kernel.seccomp.actions_logged
         enable_syscall_sandboxing(ViolationAction::AllowAndLog, &ALLOWED)
     }
 }
