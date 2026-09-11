@@ -20,6 +20,87 @@ use async_tempfile::{Ownership, TempDir, TempFile};
 
 pub use types::*;
 
+/// Auto-escape ConTeXt/TeX templates so template *data* cannot inject control
+/// sequences. `.mkiv`/`.tex` (also via a trailing `.j2`) => Custom("context");
+/// everything else keeps minijinja's default (html/json/none). Structural
+/// interpolations (filenames, setup keys) opt out with `| safe`.
+fn configure_escaping(env: &mut minijinja::Environment<'static>) {
+    env.set_auto_escape_callback(|name| match strip_jinja_ext(name).rsplit('.').next() {
+        Some("mkiv" | "tex") => minijinja::AutoEscape::Custom("context"),
+        _ => minijinja::default_auto_escape_callback(name),
+    });
+    env.set_formatter(|out, state, value| {
+        if let minijinja::AutoEscape::Custom("context") = state.auto_escape() {
+            // safe values (`|safe`, or macros returning safe strings) pass through
+            if value.is_safe() {
+                write!(out, "{value}")?;
+            } else if let Some(s) = value.as_str() {
+                out.write_str(&filters::context_escape(s))?;
+            } else {
+                // numbers/bool/none/etc: escape their string form defensively
+                out.write_str(&filters::context_escape(&value.to_string()))?;
+            }
+            Ok(())
+        } else {
+            minijinja::escape_formatter(out, state, value)
+        }
+    });
+}
+
+/// Strip a trailing `.j2`/`.jinja`/`.jinja2` so `foo.mkiv.j2` is treated as `foo.mkiv`.
+fn strip_jinja_ext(name: &str) -> &str {
+    for ext in [".j2", ".jinja", ".jinja2"] {
+        if let Some(stripped) = name.strip_suffix(ext) {
+            return stripped;
+        }
+    }
+    name
+}
+
+#[cfg(test)]
+mod context_escape_tests {
+    use super::configure_escaping;
+
+    fn env() -> minijinja::Environment<'static> {
+        let mut env = minijinja::Environment::new();
+        configure_escaping(&mut env);
+        env
+    }
+
+    #[test]
+    fn escapes_data_in_mkiv() {
+        let out = env()
+            .render_named_str(
+                "letter.mkiv",
+                "{{ v }}",
+                minijinja::context! { v => r"\input x" },
+            )
+            .unwrap();
+        assert_eq!(out, r"\letterbackslash{}input x");
+    }
+
+    #[test]
+    fn safe_opts_out() {
+        let out = env()
+            .render_named_str(
+                "letter.mkiv",
+                "{{ v | safe }}",
+                minijinja::context! { v => "de_DE" },
+            )
+            .unwrap();
+        assert_eq!(out, "de_DE");
+    }
+
+    #[test]
+    fn non_tex_template_unescaped() {
+        // .txt keeps default (no escaping) -> backslash passes through verbatim
+        let out = env()
+            .render_named_str("cano.txt", "{{ v }}", minijinja::context! { v => r"\x" })
+            .unwrap();
+        assert_eq!(out, r"\x");
+    }
+}
+
 #[derive(Debug)]
 pub struct State {
     reqwest_client: OnceLock<reqwest::Client>,
@@ -44,6 +125,8 @@ impl State {
         jinja_env.add_filter("split", filters::split);
         jinja_env.add_filter("context_escape", filters::context_escape);
         jinja_env.add_filter("qr_mp_pic", filters::qr_encode_to_mp_picture);
+
+        configure_escaping(&mut jinja_env);
         jinja_env.set_loader(minijinja::path_loader(templates_path));
 
         let jinja_env = Arc::new(jinja_env);
