@@ -17,25 +17,25 @@ use templater::*;
 
 #[derive(Debug, Parser)]
 struct Cli {
-    #[structopt(short, long, value_parser = TemplateRef::from_str)]
+    #[arg(short, long, value_parser = TemplateRef::from_str)]
     template: TemplateRef,
 
-    #[structopt(long)]
+    #[arg(long)]
     templates_path: Option<PathBuf>,
 
-    #[structopt(long)]
+    #[arg(long)]
     assets_path: Option<PathBuf>,
 
-    #[structopt(short, long)]
+    #[arg(short, long)]
     inputs: Vec<FileRef>,
 
-    #[structopt(short, long, value_parser = OutputRef::from_str)]
+    #[arg(short, long, value_parser = OutputRef::from_str)]
     output: OutputRef,
 
-    #[structopt(short, long, action = clap::ArgAction::Count)]
+    #[arg(short, long, action = clap::ArgAction::Count)]
     verbosity: u8,
 
-    #[structopt(long)]
+    #[arg(long)]
     disable_sandboxing: bool,
 }
 
