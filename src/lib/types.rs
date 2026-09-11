@@ -2,13 +2,47 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, bail, ensure};
 use mime_guess::{Mime, MimeGuess, mime};
 use nutype::nutype;
 use reqwest::Url;
 use reqwest::header;
 use serde::Deserialize;
-use tokio::io::{AsyncReadExt, BufReader, stdin};
+use tokio::io::{AsyncRead, AsyncReadExt, BufReader, stdin};
+
+/// Upper bound on a single input's size. Generous: data inputs are KB-scale.
+/// Override with `MAX_INPUT_BYTES`.
+fn max_input_bytes() -> usize {
+    std::env::var("MAX_INPUT_BYTES")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(16 * 1024 * 1024)
+}
+
+/// Read an `AsyncRead` into a `Vec`, failing if it exceeds `cap` bytes.
+async fn read_capped_reader<R: AsyncRead + Unpin>(reader: R, cap: usize) -> Result<Vec<u8>> {
+    let mut buf = Vec::new();
+    // read one past the cap so an exactly-cap input still succeeds
+    reader.take(cap as u64 + 1).read_to_end(&mut buf).await?;
+    ensure!(buf.len() <= cap, "input exceeds {cap}-byte limit");
+    Ok(buf)
+}
+
+/// Stream an HTTP response body into a `Vec`, failing if it exceeds `cap` bytes.
+async fn read_capped_http(mut res: reqwest::Response, cap: usize) -> Result<Vec<u8>> {
+    if let Some(len) = res.content_length() {
+        ensure!(len <= cap as u64, "input exceeds {cap}-byte limit");
+    }
+    let mut buf = Vec::new();
+    while let Some(chunk) = res.chunk().await? {
+        ensure!(
+            buf.len() + chunk.len() <= cap,
+            "input exceeds {cap}-byte limit"
+        );
+        buf.extend_from_slice(&chunk);
+    }
+    Ok(buf)
+}
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct RenderJob {
@@ -120,17 +154,20 @@ impl FileRef {
         match self {
             FileRef::File(filename) => {
                 if filename.as_os_str() == "-" {
-                    let mut reader = BufReader::new(stdin());
-                    let mut bytes = vec![];
-                    reader
-                        .read_to_end(&mut bytes)
+                    let reader = BufReader::new(stdin());
+                    let bytes = read_capped_reader(reader, max_input_bytes())
                         .await
                         .context("Cannot read from stdin")?;
                     Ok(serde_json::from_slice(&bytes)?)
                 } else {
-                    let bytes = tokio::fs::read(filename).await.with_context(|| {
+                    let file = tokio::fs::File::open(filename).await.with_context(|| {
                         format!("Cannot open input file {}", filename.display())
                     })?;
+                    let bytes = read_capped_reader(file, max_input_bytes())
+                        .await
+                        .with_context(|| {
+                            format!("Cannot read input file {}", filename.display())
+                        })?;
                     let data = match filename.extension().and_then(|s| s.to_str()) {
                         Some("json") => serde_json::from_slice(&bytes)?,
                         Some("yaml") => serde_saphyr::from_slice(&bytes)?,
@@ -153,7 +190,7 @@ impl FileRef {
                     .and_then(|v| v.parse::<Mime>().ok())
                     .unwrap_or(mime::APPLICATION_JSON);
 
-                let bytes = res.bytes().await?;
+                let bytes = read_capped_http(res, max_input_bytes()).await?;
 
                 // Note: it's not possible to use `mime::JSON`, because `mime::YAML` does not exist
                 let data = match (content_type.type_(), content_type.subtype().as_str()) {
@@ -214,12 +251,28 @@ mod test {
     #[test]
     fn test_template_ref_validation() {
         let ok = ["letter.mkiv", "partials/csv.mkiv", "a/b/c.tex"];
-        let bad = ["", "..", "../x.tex", "a/../b", "/etc/passwd", "a\\b", "x\"y", "./x", "a/"];
+        let bad = [
+            "",
+            "..",
+            "../x.tex",
+            "a/../b",
+            "/etc/passwd",
+            "a\\b",
+            "x\"y",
+            "./x",
+            "a/",
+        ];
         for t in ok {
-            assert!(TemplateRef::try_new(t.to_string()).is_ok(), "should accept {t:?}");
+            assert!(
+                TemplateRef::try_new(t.to_string()).is_ok(),
+                "should accept {t:?}"
+            );
         }
         for t in bad {
-            assert!(TemplateRef::try_new(t.to_string()).is_err(), "should reject {t:?}");
+            assert!(
+                TemplateRef::try_new(t.to_string()).is_err(),
+                "should reject {t:?}"
+            );
         }
     }
 
@@ -237,5 +290,20 @@ mod test {
         let data: HashMap<String, Value> = serde_saphyr::from_slice(yaml).unwrap();
         assert_eq!(data["name"], Value::from("ACME"));
         assert_eq!(data["count"], Value::from(3));
+    }
+
+    #[tokio::test]
+    async fn test_read_capped_reader() {
+        // exactly at the cap succeeds
+        let ok = crate::types::read_capped_reader(&b"hello"[..], 5)
+            .await
+            .unwrap();
+        assert_eq!(ok, b"hello");
+        // one over the cap fails
+        assert!(
+            crate::types::read_capped_reader(&b"hello!"[..], 5)
+                .await
+                .is_err()
+        );
     }
 }

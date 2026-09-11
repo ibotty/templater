@@ -6,7 +6,9 @@ use std::collections::HashMap;
 use std::os::unix::process::ExitStatusExt;
 use std::path::Path;
 use std::sync::Arc;
-use std::sync::OnceLock;
+use std::time::Duration;
+
+use tokio::sync::Semaphore;
 
 use anyhow::Context;
 use foundations::security::common_syscall_allow_lists::*;
@@ -15,7 +17,7 @@ use tokio::fs;
 use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
 
-use anyhow::{Result, ensure};
+use anyhow::{Result, bail, ensure};
 use async_tempfile::{Ownership, TempDir, TempFile};
 
 pub use types::*;
@@ -103,8 +105,9 @@ mod context_escape_tests {
 
 #[derive(Debug)]
 pub struct State {
-    reqwest_client: OnceLock<reqwest::Client>,
+    reqwest_client: reqwest::Client,
     jinja_env: Arc<minijinja::Environment<'static>>,
+    compile_semaphore: Arc<Semaphore>,
 }
 
 impl State {
@@ -130,30 +133,49 @@ impl State {
         jinja_env.set_loader(minijinja::path_loader(templates_path));
 
         let jinja_env = Arc::new(jinja_env);
-        let reqwest_client = OnceLock::new();
+        let reqwest_client = build_client();
+
+        // Compiles are CPU-bound; cap concurrency so requests queue instead of
+        // forking unbounded `context` processes. Override with MAX_CONCURRENT_COMPILES.
+        let permits = std::env::var("MAX_CONCURRENT_COMPILES")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .or_else(|| std::thread::available_parallelism().ok().map(Into::into))
+            .unwrap_or(4);
+        let compile_semaphore = Arc::new(Semaphore::new(permits));
 
         State {
             jinja_env,
             reqwest_client,
+            compile_semaphore,
         }
     }
 
     pub async fn new_job(&self, job: RenderJob) -> Result<Renderer> {
         Renderer::setup(
-            self.reqwest_client
-                .get_or_init(reqwest::Client::new)
-                .clone(),
+            self.reqwest_client.clone(),
             self.jinja_env.clone(),
+            self.compile_semaphore.clone(),
             job,
         )
         .await
     }
 }
 
+/// reqwest client with connect/request timeouts so a hung remote can't park a job.
+fn build_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(60))
+        .build()
+        .expect("static reqwest config")
+}
+
 pub struct Renderer {
     dir: TempDir,
     reqwest_client: reqwest::Client,
     jinja_env: Arc<minijinja::Environment<'static>>,
+    compile_semaphore: Arc<Semaphore>,
     template: TemplateRef,
     output: OutputRef,
     data: HashMap<String, minijinja::Value>,
@@ -163,6 +185,7 @@ impl Renderer {
     pub async fn setup(
         reqwest_client: reqwest::Client,
         jinja_env: Arc<minijinja::Environment<'static>>,
+        compile_semaphore: Arc<Semaphore>,
         job: RenderJob,
     ) -> Result<Self> {
         let dir = TempDir::new().await?;
@@ -176,6 +199,7 @@ impl Renderer {
             dir,
             reqwest_client,
             jinja_env,
+            compile_semaphore,
             data,
             template: job.template,
             output: job.output,
@@ -189,6 +213,11 @@ impl Renderer {
             .context("Could not create template")?;
 
         if self.template.should_compile() {
+            let _permit = self
+                .compile_semaphore
+                .acquire()
+                .await
+                .expect("compile semaphore closed");
             output_file = self
                 .compile_pdf(&output_file)
                 .await
@@ -272,14 +301,30 @@ impl Renderer {
         let output_file_path = path.with_file_name(output_file_name);
         debug!("trying to compile"; "template-file" => path.to_str(), "output-file" => output_file_path.to_str());
 
-        let command = "context";
-        let context_proc = Command::new(command)
+        // env-tunable; generous default for complex ConTeXt runs.
+        let timeout_secs = std::env::var("CONTEXT_TIMEOUT_SECS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(120);
+
+        // spawn (not output()) so kill_on_drop reaps the child if we time out.
+        let child = Command::new("context")
             .arg("--batchmode")
             .arg(path)
             .current_dir(&self.dir)
-            .output()
-            .await
+            .kill_on_drop(true)
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
             .context("Could not spawn command")?;
+
+        let context_proc =
+            match tokio::time::timeout(Duration::from_secs(timeout_secs), child.wait_with_output())
+                .await
+            {
+                Ok(res) => res.context("Could not run command")?,
+                Err(_elapsed) => bail!("compilation timed out after {timeout_secs}s"),
+            };
         let status = context_proc.status;
 
         debug!("ran pdf compilation"; "status" => status.code(), "signal" => status.signal(), "core_dumped" => status.core_dumped(), "stopped_signal" => status.stopped_signal());
