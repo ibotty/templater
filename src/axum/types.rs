@@ -5,7 +5,6 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use foundations::telemetry::log;
-use serde::{Deserialize, Serialize};
 use templater::State;
 
 #[derive(Clone)]
@@ -13,9 +12,6 @@ pub struct ServerState {
     pub templater_state: Arc<State>,
     pub may_output_file: bool,
 }
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct RenderResponse {}
 
 #[derive(Debug)]
 pub enum AppError {

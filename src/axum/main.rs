@@ -6,8 +6,8 @@ use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::Arc;
 
-use axum::Json;
 use axum::extract::{self, ConnectInfo};
+use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use foundations::BootstrapResult;
 use foundations::cli::{Arg, ArgAction, Cli};
@@ -128,10 +128,7 @@ async fn post_renderjob(
 
     let renderer = state.templater_state.new_job(renderjob).await?;
     match renderer.run_job().await? {
-        None => {
-            let response = RenderResponse {};
-            Ok(Json(response).into_response())
-        }
+        None => Ok(StatusCode::OK.into_response()),
         Some(output) => {
             let headers = [
                 (
