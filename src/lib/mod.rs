@@ -3,6 +3,7 @@ pub mod s3;
 pub mod types;
 
 use std::collections::HashMap;
+use std::os::unix::process::ExitStatusExt;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::OnceLock;
@@ -207,7 +208,7 @@ impl Renderer {
             .context("Could not spawn command")?;
         let status = context_proc.status;
 
-        debug!("ran pdf compilation"; "status" => status.code());
+        debug!("ran pdf compilation"; "status" => status.code(), "signal" => status.signal(), "core_dumped" => status.core_dumped(), "stopped_signal" => status.stopped_signal());
         debug!(
             "stdout: {:?}",
             String::from_utf8_lossy(&context_proc.stdout)
