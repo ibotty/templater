@@ -33,7 +33,7 @@ impl TemplateRef {
     pub fn extension(&self) -> Option<&str> {
         Path::new(self.as_ref())
             .extension()
-            .map(|ext| ext.to_str().unwrap())
+            .and_then(|ext| ext.to_str())
     }
 
     pub fn mime_type(&self) -> Mime {
