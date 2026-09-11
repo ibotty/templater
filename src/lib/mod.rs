@@ -15,7 +15,7 @@ use tokio::fs;
 use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
 
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 use async_tempfile::{Ownership, TempDir, TempFile};
 
 pub use types::*;

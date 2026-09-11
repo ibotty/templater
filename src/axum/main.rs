@@ -6,9 +6,10 @@ use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::Arc;
 
+use axum::Json;
 use axum::extract::{self, ConnectInfo};
 use axum::response::IntoResponse;
-use axum::Json;
+use foundations::BootstrapResult;
 use foundations::cli::{Arg, ArgAction, Cli};
 use foundations::telemetry::TelemetryConfig;
 use foundations::telemetry::{
@@ -16,7 +17,6 @@ use foundations::telemetry::{
     log::{self, trace},
     settings::TelemetrySettings,
 };
-use foundations::BootstrapResult;
 use reqwest::header;
 use tokio::net::TcpListener;
 use tokio::signal::unix;
@@ -29,10 +29,12 @@ async fn main() -> BootstrapResult<()> {
     let service_info = foundations::service_info!();
     let cli = Cli::<TelemetrySettings>::new(
         &service_info,
-        vec![Arg::new("check")
-            .long("check")
-            .action(ArgAction::SetTrue)
-            .help("Validate config.")],
+        vec![
+            Arg::new("check")
+                .long("check")
+                .action(ArgAction::SetTrue)
+                .help("Validate config."),
+        ],
     )?;
 
     if cli.arg_matches.get_flag("check") {
@@ -119,9 +121,10 @@ async fn post_renderjob(
     trace!("got request"; "client-ip" => format!("{}", client_addr.ip()));
 
     if !state.may_output_file
-        && let OutputRef::File(FileRef::File(_file)) = renderjob.output {
-            return Err(AppError::NotAllowedOutput);
-        }
+        && let OutputRef::File(FileRef::File(_file)) = renderjob.output
+    {
+        return Err(AppError::NotAllowedOutput);
+    }
 
     let renderer = state.templater_state.new_job(renderjob).await?;
     match renderer.run_job().await? {

@@ -1,5 +1,5 @@
-use icu_decimal::input::{Decimal, FloatPrecision};
 use icu_decimal::DecimalFormatter;
+use icu_decimal::input::{Decimal, FloatPrecision};
 use icu_locale_core::locale;
 use minijinja::Value;
 use qrcodegen::{QrCode, QrCodeEcc};
@@ -75,7 +75,7 @@ mod tests {
 
     #[test]
     fn test_qr_encode_to_metapost_picture() {
-        let mp = qr_encode_to_metapost_picture("https://example.com");
+        let mp = qr_encode_to_mp_picture("https://example.com");
         assert!(mp.starts_with("beginfig(1);\n"));
         assert!(mp.trim_end().ends_with("endfig;"));
         // top-left finder module (QR r=0,c=0) is dark and must map to the top row.

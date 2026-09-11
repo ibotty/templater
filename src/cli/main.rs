@@ -5,12 +5,12 @@ use anyhow::Context;
 use clap::Parser;
 use foundations::telemetry::TelemetryConfig;
 use foundations::{
+    BootstrapResult,
     telemetry::{
         self,
         log::{self, debug},
         settings::{Level, TelemetrySettings},
     },
-    BootstrapResult,
 };
 
 use templater::*;

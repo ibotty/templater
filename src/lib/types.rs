@@ -2,13 +2,13 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use anyhow::{bail, Context, Result};
-use mime_guess::{mime, Mime, MimeGuess};
+use anyhow::{Context, Result, bail};
+use mime_guess::{Mime, MimeGuess, mime};
 use nutype::nutype;
-use reqwest::header;
 use reqwest::Url;
+use reqwest::header;
 use serde::Deserialize;
-use tokio::io::{stdin, AsyncReadExt, BufReader};
+use tokio::io::{AsyncReadExt, BufReader, stdin};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct RenderJob {
@@ -81,7 +81,6 @@ pub enum OutputRef {
     #[default]
     Buffer,
 }
-
 
 impl FromStr for OutputRef {
     type Err = anyhow::Error;
