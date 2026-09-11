@@ -122,21 +122,11 @@ impl Renderer {
             }
             OutputRef::File(FileRef::File(filename)) => {
                 if filename.as_os_str() == "-" {
-                    let mut buf: [u8; 64] = [0; 64];
                     let mut stdout = io::stdout();
-                    loop {
-                        let n = output_file
-                            .read(&mut buf)
-                            .await
-                            .context("Could not read from file")?;
-                        if n == 0 {
-                            break;
-                        }
-                        stdout
-                            .write(&buf[0..n])
-                            .await
-                            .context("Could not write to stdout")?;
-                    }
+                    io::copy(&mut output_file, &mut stdout)
+                        .await
+                        .context("Could not write to stdout")?;
+                    stdout.flush().await.context("Could not flush stdout")?;
                 } else {
                     let _ = fs::copy(output_file.file_path(), filename)
                         .await
