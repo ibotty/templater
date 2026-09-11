@@ -190,7 +190,7 @@ mod test {
             output: OutputRef::from_str("/test/file").unwrap(),
             inputs: vec![Input::Inline(HashMap::from([(
                 "test".to_string(),
-                Value::from_serialize(&"value"),
+                Value::from_serialize("value"),
             )]))],
         };
         assert_eq!(parsed, renderjob);

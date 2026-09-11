@@ -135,7 +135,7 @@ mod test {
         }
         let presigned_url = get_presigned_put_url(&bucket, key, presigned_ttl).await?;
         let mime_type = mime::TEXT_PLAIN;
-        let _ = super::upload_file(&reqwest_client, tempfile, mime_type, presigned_url).await?;
+        super::upload_file(&reqwest_client, tempfile, mime_type, presigned_url).await?;
 
         // cleanup
         let _ = remove_bucket_key(&bucket, key).await;
