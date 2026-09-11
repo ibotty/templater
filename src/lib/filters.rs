@@ -1,5 +1,5 @@
-use icu_decimal::DecimalFormatter;
 use icu_decimal::input::{Decimal, FloatPrecision};
+use icu_decimal::DecimalFormatter;
 use icu_locale_core::locale;
 use minijinja::Value;
 use qrcodegen::{QrCode, QrCodeEcc};
@@ -52,26 +52,48 @@ pub fn qr_encode_to_mp_picture(input: &str) -> String {
     out
 }
 
-/// This will tex-escape all characters but `\`.
+/// TeX-escapes every ConTeXt special character, including `\` (so untrusted
+/// input cannot start a control sequence). Single pass: chained `str::replace`
+/// cannot do this correctly because the inserted `\letter...{}` macros contain
+/// braces that a later brace-replace would re-escape.
 pub fn context_escape(input: &str) -> String {
-    input
-        .replace('{', "\\{")
-        .replace('}', "\\}")
-        .replace('#', "\\letterhash{}")
-        .replace('$', "\\letterdollar{}")
-        .replace('%', "\\letterpercent{}")
-        .replace('&', "\\letterampersand{}")
-        .replace('_', "\\letterunderscore{}")
-        .replace('[', "\\letterleftbracket{}")
-        .replace(']', "\\letterrightbracket{}")
-        .replace('|', "\\letterbar{}")
-        .replace('~', "\\lettertilde{}")
-        .replace('^', "\\letterhat{}")
+    let mut out = String::with_capacity(input.len());
+    for c in input.chars() {
+        match c {
+            '\\' => out.push_str("\\letterbackslash{}"),
+            '{' => out.push_str("\\{"),
+            '}' => out.push_str("\\}"),
+            '#' => out.push_str("\\letterhash{}"),
+            '$' => out.push_str("\\letterdollar{}"),
+            '%' => out.push_str("\\letterpercent{}"),
+            '&' => out.push_str("\\letterampersand{}"),
+            '_' => out.push_str("\\letterunderscore{}"),
+            '[' => out.push_str("\\letterleftbracket{}"),
+            ']' => out.push_str("\\letterrightbracket{}"),
+            '|' => out.push_str("\\letterbar{}"),
+            '~' => out.push_str("\\lettertilde{}"),
+            '^' => out.push_str("\\letterhat{}"),
+            _ => out.push(c),
+        }
+    }
+    out
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_context_escape() {
+        // backslash cannot start a control sequence
+        let escaped = context_escape(r"\input x");
+        assert!(!escaped.contains(r"\input"));
+        assert_eq!(escaped, r"\letterbackslash{}input x");
+        // braces from real input are escaped; macro braces are not re-escaped
+        assert_eq!(context_escape("\\{"), "\\letterbackslash{}\\{");
+        // plain text is untouched
+        assert_eq!(context_escape("hello"), "hello");
+    }
 
     #[test]
     fn test_qr_encode_to_metapost_picture() {
