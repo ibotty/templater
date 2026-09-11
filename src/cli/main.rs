@@ -52,8 +52,9 @@ async fn main() -> BootstrapResult<()> {
 
     let opts = Cli::parse();
 
+    // slog Level domain is 1..=6 (Critical=1 .. Trace=6).
     let log_level =
-        Level::from_usize((Level::Warning.as_usize() + opts.verbosity as usize).clamp(0, 5))
+        Level::from_usize((Level::Warning.as_usize() + opts.verbosity as usize).clamp(1, 6))
             .expect("could not set loglevel");
     log::set_verbosity(log_level.into()).map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
