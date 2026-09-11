@@ -118,7 +118,7 @@ impl FileRef {
                     })?;
                     let data = match filename.extension().and_then(|s| s.to_str()) {
                         Some("json") => serde_json::from_slice(&bytes)?,
-                        Some("yaml") => serde_yaml::from_slice(&bytes)?,
+                        Some("yaml") => serde_saphyr::from_slice(&bytes)?,
                         _ => bail!("Unsupported input file {}", filename.display()),
                     };
                     Ok(data)
@@ -143,7 +143,7 @@ impl FileRef {
                 // Note: it's not possible to use `mime::JSON`, because `mime::YAML` does not exist
                 let data = match (content_type.type_(), content_type.subtype().as_str()) {
                     (mime::APPLICATION, "json") => serde_json::from_slice(&bytes)?,
-                    (mime::APPLICATION, "yaml") => serde_yaml::from_slice(&bytes)?,
+                    (mime::APPLICATION, "yaml") => serde_saphyr::from_slice(&bytes)?,
                     _ => bail!("Unsupported input file {}", content_type),
                 };
                 Ok(data)
@@ -194,5 +194,13 @@ mod test {
             )]))],
         };
         assert_eq!(parsed, renderjob);
+    }
+
+    #[test]
+    fn test_yaml_input() {
+        let yaml = b"name: ACME\ncount: 3\n";
+        let data: HashMap<String, Value> = serde_saphyr::from_slice(yaml).unwrap();
+        assert_eq!(data["name"], Value::from("ACME"));
+        assert_eq!(data["count"], Value::from(3));
     }
 }
