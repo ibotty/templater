@@ -153,21 +153,21 @@ impl FileRef {
 }
 
 impl From<&str> for FileRef {
+    /// Parses the parameter and, if it resembles a URL (i.e. reqwest can parse it),
+    /// treats it as a URL, otherwise as a filename. Infallible: any non-URL is a path.
     fn from(value: &str) -> Self {
-        Self::from_str(value).unwrap()
+        match Url::parse(value) {
+            Ok(url) => FileRef::Url(url),
+            Err(_) => FileRef::File(Path::new(value).to_path_buf()),
+        }
     }
 }
 
 impl FromStr for FileRef {
     type Err = anyhow::Error;
 
-    /// This will parse the parameter and if it resembles a URL (i.e. reqwest can parse it) treat
-    /// it as URL, if not as filename.
-    fn from_str(str: &str) -> Result<Self> {
-        Ok(match Url::parse(str) {
-            Ok(url) => FileRef::Url(url),
-            Err(_) => FileRef::File(Path::new(str).to_path_buf()),
-        })
+    fn from_str(s: &str) -> Result<Self> {
+        Ok(Self::from(s))
     }
 }
 
