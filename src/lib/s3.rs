@@ -21,6 +21,9 @@ pub async fn upload_file(
     let target_url_string = target_url.to_string();
     debug!("uploading file"; "url" => &target_url_string);
 
+    // Arc<Mutex>: InspectReader owns an FnMut that mutates the hasher, but we also
+    // need the hasher back after the stream to finalize(); wrap_stream requires the
+    // closure be Send + 'static. Uncontended by construction (bytes flow serially).
     let hasher = Md5::new();
     let hasher_rc = Arc::new(Mutex::new(hasher));
 
