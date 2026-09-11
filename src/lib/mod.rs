@@ -43,6 +43,7 @@ impl State {
         jinja_env.add_filter("currency_format", filters::currency_format);
         jinja_env.add_filter("split", filters::split);
         jinja_env.add_filter("context_escape", filters::context_escape);
+        jinja_env.add_filter("qr_mp_pic", filters::qr_encode_to_mp_picture);
         jinja_env.set_loader(minijinja::path_loader(templates_path));
 
         let jinja_env = Arc::new(jinja_env);

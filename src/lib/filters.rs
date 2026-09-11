@@ -2,6 +2,7 @@ use icu_decimal::input::{Decimal, FloatPrecision};
 use icu_decimal::DecimalFormatter;
 use icu_locale_core::locale;
 use minijinja::Value;
+use qrcodegen::{QrCode, QrCodeEcc};
 
 /// This filter will format the number with thousand separators and two decimal places.
 pub fn currency_format(value: f64, lang: Value, magnitude: Option<u8>) -> String {
@@ -30,6 +31,27 @@ pub fn split(input: &str, pat: &str) -> Vec<String> {
     input.split(pat).map(str::to_string).collect()
 }
 
+/// Encode `input` as a QR code and emit a MetaPost figure drawing it as filled
+/// unit squares (one per dark module).
+pub fn qr_encode_to_mp_picture(input: &str) -> String {
+    let qr =
+        QrCode::encode_text(input, QrCodeEcc::Medium).expect("input too long to encode as QR code");
+    let n = qr.size();
+    let mut out = String::from("beginfig(1);\n");
+    for r in 0..n {
+        for c in 0..n {
+            if qr.get_module(c, r) {
+                // flip so row 0 (QR top) is on top
+                let (x, y) = (c, n - 1 - r);
+                out += &format!("  fill unitsquare shifted ({x},{y});\n");
+            }
+        }
+    }
+    // out += "  currentpicture := currentpicture scaled u;\n";
+    out += "endfig;\n";
+    out
+}
+
 /// This will tex-escape all characters but `\`.
 pub fn context_escape(input: &str) -> String {
     input
@@ -45,4 +67,18 @@ pub fn context_escape(input: &str) -> String {
         .replace('|', "\\letterbar{}")
         .replace('~', "\\lettertilde{}")
         .replace('^', "\\letterhat{}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_qr_encode_to_metapost_picture() {
+        let mp = qr_encode_to_metapost_picture("https://example.com");
+        assert!(mp.starts_with("beginfig(1);\n"));
+        assert!(mp.trim_end().ends_with("endfig;"));
+        // top-left finder module (QR r=0,c=0) is dark and must map to the top row.
+        assert!(mp.contains("fill unitsquare shifted (0,"));
+    }
 }
