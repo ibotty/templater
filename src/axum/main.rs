@@ -118,11 +118,10 @@ async fn post_renderjob(
 ) -> Result<impl IntoResponse, AppError> {
     trace!("got request"; "client-ip" => format!("{}", client_addr.ip()));
 
-    if !state.may_output_file {
-        if let OutputRef::File(FileRef::File(_file)) = renderjob.output {
+    if !state.may_output_file
+        && let OutputRef::File(FileRef::File(_file)) = renderjob.output {
             return Err(AppError::NotAllowedOutput);
         }
-    }
 
     let renderer = state.templater_state.new_job(renderjob).await?;
     match renderer.run_job().await? {

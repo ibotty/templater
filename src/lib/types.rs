@@ -75,16 +75,13 @@ impl Input {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(untagged)]
+#[derive(Default)]
 pub enum OutputRef {
     File(FileRef),
+    #[default]
     Buffer,
 }
 
-impl Default for OutputRef {
-    fn default() -> Self {
-        Self::Buffer
-    }
-}
 
 impl FromStr for OutputRef {
     type Err = anyhow::Error;

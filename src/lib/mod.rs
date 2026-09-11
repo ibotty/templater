@@ -84,7 +84,7 @@ impl Renderer {
 
         let mut data: HashMap<String, minijinja::Value> = Default::default();
         for input in job.inputs.into_iter() {
-            data.extend(input.read_into_env(&reqwest_client).await?.into_iter());
+            data.extend(input.read_into_env(&reqwest_client).await?);
         }
 
         Ok(Self {
