@@ -192,7 +192,7 @@ mod tests {
 
     fn job(inputs: Vec<Input>, output: OutputRef) -> RenderJob {
         RenderJob {
-            template: TemplateRef::from("t.mkiv".to_string()),
+            template: TemplateRef::try_new("t.mkiv".to_string()).unwrap(),
             output,
             inputs,
         }

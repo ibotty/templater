@@ -18,8 +18,23 @@ pub struct RenderJob {
     pub inputs: Vec<Input>,
 }
 
-#[nutype(derive(AsRef, From, FromStr, Clone, Debug, Deserialize, Eq, PartialEq))]
+#[nutype(
+    validate(predicate = is_safe_template_ref),
+    derive(AsRef, TryFrom, FromStr, Clone, Debug, Deserialize, Eq, PartialEq),
+)]
 pub struct TemplateRef(String);
+
+/// A template name must be a traversal-safe relative subpath: non-empty, not
+/// absolute, `/`-separated components only, no `..`, no `\`, no control chars,
+/// no `"` (the last also keeps the Content-Disposition header well-formed).
+fn is_safe_template_ref(s: &str) -> bool {
+    !s.is_empty()
+        && !s.starts_with('/')
+        && !s.contains('\\')
+        && !s.contains('"')
+        && !s.chars().any(|c| c.is_control())
+        && s.split('/').all(|c| !c.is_empty() && c != "." && c != "..")
+}
 
 impl TemplateRef {
     const COMPILE_EXTENSIONS: [&'static str; 2] = ["tex", "mkiv"];
@@ -186,7 +201,7 @@ mod test {
         }"#;
         let parsed: RenderJob = serde_json::from_str(sample).unwrap();
         let renderjob = RenderJob {
-            template: TemplateRef::from("test.j2".to_string()),
+            template: TemplateRef::try_new("test.j2".to_string()).unwrap(),
             output: OutputRef::from_str("/test/file").unwrap(),
             inputs: vec![Input::Inline(HashMap::from([(
                 "test".to_string(),
@@ -194,6 +209,26 @@ mod test {
             )]))],
         };
         assert_eq!(parsed, renderjob);
+    }
+
+    #[test]
+    fn test_template_ref_validation() {
+        let ok = ["letter.mkiv", "partials/csv.mkiv", "a/b/c.tex"];
+        let bad = ["", "..", "../x.tex", "a/../b", "/etc/passwd", "a\\b", "x\"y", "./x", "a/"];
+        for t in ok {
+            assert!(TemplateRef::try_new(t.to_string()).is_ok(), "should accept {t:?}");
+        }
+        for t in bad {
+            assert!(TemplateRef::try_new(t.to_string()).is_err(), "should reject {t:?}");
+        }
+    }
+
+    #[test]
+    fn test_renderjob_rejects_traversal() {
+        let bad = r#"{"template":"../../x.tex","inputs":[]}"#;
+        assert!(serde_json::from_str::<RenderJob>(bad).is_err());
+        let ok = r#"{"template":"letter.mkiv","inputs":[]}"#;
+        assert!(serde_json::from_str::<RenderJob>(ok).is_ok());
     }
 
     #[test]

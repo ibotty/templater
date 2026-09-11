@@ -17,8 +17,8 @@ use templater::*;
 
 #[derive(Debug, Parser)]
 struct Cli {
-    #[arg(short, long, value_parser = TemplateRef::from_str)]
-    template: TemplateRef,
+    #[arg(short, long)]
+    template: PathBuf,
 
     #[arg(long)]
     templates_path: Option<PathBuf>,
@@ -60,13 +60,17 @@ async fn main() -> BootstrapResult<()> {
 
     debug!("parsed cli opts"; "opts" => format!("{:?}", opts));
 
-    let template_path = Path::new(opts.template.as_ref());
+    let template_path = opts.template.as_path();
     let this_template_dir = template_path
         .canonicalize()
         .ok()
         .and_then(|p| p.parent().map(|p| p.to_path_buf()));
 
-    let template = TemplateRef::from_str(opts.template.as_ref().rsplit('/').next().unwrap())?;
+    let basename = template_path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .context("template path has no filename")?;
+    let template = TemplateRef::try_new(basename.to_string())?;
 
     let assets_path = opts
         .assets_path
