@@ -113,7 +113,10 @@ mod test {
         Ok(result.uri().to_string())
     }
 
+    // Requires a live S3-compatible endpoint (AWS_ENDPOINT_URL, S3_BUCKET, creds).
+    // Run with `cargo test -- --ignored`.
     #[tokio::test]
+    #[ignore = "needs live S3"]
     async fn test_presigned_put() -> Result<()> {
         let bucket = env::var("S3_BUCKET").unwrap();
         let key = "test-key";
