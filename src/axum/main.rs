@@ -55,10 +55,12 @@ async fn main() -> BootstrapResult<()> {
         .canonicalize()
         .ok();
     let templater_state = Arc::new(State::new(templates_path, assets_path));
-    let may_output_file = env::var("MAY_OUTPUT_TO_FILE").is_ok();
+    let may_output_file = env_flag("MAY_OUTPUT_TO_FILE");
+    let may_input_file = env_flag("MAY_INPUT_FROM_FILE");
     let server_state = ServerState {
         templater_state,
         may_output_file,
+        may_input_file,
     };
 
     let bind_addr = "0.0.0.0:8080";
@@ -112,6 +114,31 @@ async fn healthz() -> &'static str {
     "OK\n"
 }
 
+/// An env var is "set" only for truthy values, not merely presence.
+fn env_flag(name: &str) -> bool {
+    matches!(env::var(name).as_deref(), Ok("1" | "true" | "yes"))
+}
+
+/// Reject file-path inputs/outputs unless explicitly allowed. Stdin (`-`) is
+/// never reachable over HTTP (it would read the server's own stdin).
+fn gate_file_io(
+    may_output_file: bool,
+    may_input_file: bool,
+    job: &RenderJob,
+) -> Result<(), AppError> {
+    if !may_output_file && matches!(job.output, OutputRef::File(FileRef::File(_))) {
+        return Err(AppError::NotAllowedOutput);
+    }
+    for input in &job.inputs {
+        if let Input::FileRef(FileRef::File(path)) = input
+            && (path.as_os_str() == "-" || !may_input_file)
+        {
+            return Err(AppError::NotAllowedInput);
+        }
+    }
+    Ok(())
+}
+
 #[axum::debug_handler]
 async fn post_renderjob(
     state: axum::extract::State<ServerState>,
@@ -120,11 +147,7 @@ async fn post_renderjob(
 ) -> Result<impl IntoResponse, AppError> {
     trace!("got request"; "client-ip" => format!("{}", client_addr.ip()));
 
-    if !state.may_output_file
-        && let OutputRef::File(FileRef::File(_file)) = renderjob.output
-    {
-        return Err(AppError::NotAllowedOutput);
-    }
+    gate_file_io(state.may_output_file, state.may_input_file, &renderjob)?;
 
     let renderer = state.templater_state.new_job(renderjob).await?;
     match renderer.run_job().await? {
@@ -159,4 +182,59 @@ fn sandbox_syscalls() -> BootstrapResult<()> {
         ]
     }
     enable_syscall_sandboxing(ViolationAction::KillProcess, &ALLOWED)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+    use std::str::FromStr;
+
+    fn job(inputs: Vec<Input>, output: OutputRef) -> RenderJob {
+        RenderJob {
+            template: TemplateRef::from("t.mkiv".to_string()),
+            output,
+            inputs,
+        }
+    }
+
+    #[test]
+    fn file_input_rejected_by_default() {
+        let j = job(
+            vec![Input::FileRef(FileRef::from("/etc/passwd"))],
+            OutputRef::Buffer,
+        );
+        assert!(matches!(
+            gate_file_io(false, false, &j),
+            Err(AppError::NotAllowedInput)
+        ));
+        // allowed when flag set
+        assert!(gate_file_io(false, true, &j).is_ok());
+    }
+
+    #[test]
+    fn stdin_input_always_rejected() {
+        let j = job(vec![Input::FileRef(FileRef::from("-"))], OutputRef::Buffer);
+        // even with may_input_file = true
+        assert!(matches!(
+            gate_file_io(false, true, &j),
+            Err(AppError::NotAllowedInput)
+        ));
+    }
+
+    #[test]
+    fn inline_and_url_inputs_pass() {
+        let j = job(vec![Input::Inline(HashMap::new())], OutputRef::Buffer);
+        assert!(gate_file_io(false, false, &j).is_ok());
+    }
+
+    #[test]
+    fn file_output_gated() {
+        let j = job(vec![], OutputRef::from_str("/tmp/x.pdf").unwrap());
+        assert!(matches!(
+            gate_file_io(false, false, &j),
+            Err(AppError::NotAllowedOutput)
+        ));
+        assert!(gate_file_io(true, false, &j).is_ok());
+    }
 }

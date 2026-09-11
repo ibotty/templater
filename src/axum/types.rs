@@ -11,12 +11,14 @@ use templater::State;
 pub struct ServerState {
     pub templater_state: Arc<State>,
     pub may_output_file: bool,
+    pub may_input_file: bool,
 }
 
 #[derive(Debug)]
 pub enum AppError {
     AnyError(anyhow::Error),
     NotAllowedOutput,
+    NotAllowedInput,
 }
 
 impl IntoResponse for AppError {
@@ -29,6 +31,10 @@ impl IntoResponse for AppError {
             Self::NotAllowedOutput => {
                 log::error!("Output into file not allowed.");
                 (StatusCode::BAD_REQUEST, "Invalid output.")
+            }
+            Self::NotAllowedInput => {
+                log::error!("Input from file not allowed.");
+                (StatusCode::BAD_REQUEST, "Invalid input.")
             }
         }
         .into_response()

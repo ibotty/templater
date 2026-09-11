@@ -1,5 +1,5 @@
-use icu_decimal::input::{Decimal, FloatPrecision};
 use icu_decimal::DecimalFormatter;
+use icu_decimal::input::{Decimal, FloatPrecision};
 use icu_locale_core::locale;
 use minijinja::Value;
 use qrcodegen::{QrCode, QrCodeEcc};
