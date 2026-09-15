@@ -17,7 +17,7 @@ use tokio::fs;
 use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
 
-use anyhow::{Result, bail, ensure};
+use anyhow::{Result, bail};
 use async_tempfile::{Ownership, TempDir, TempFile};
 
 pub use types::*;
@@ -184,6 +184,29 @@ fn configure_syntax(
             }
         }
     });
+}
+
+/// Where a failed compile's log goes: beside a real file output, with a `.log`
+/// extension. `None` for stdout, S3 and buffer outputs, which have no directory.
+fn log_dest(output: &OutputRef) -> Option<PathBuf> {
+    match output {
+        OutputRef::File(FileRef::File(p)) if p.as_os_str() != "-" => Some(p.with_extension("log")),
+        _ => None,
+    }
+}
+
+#[test]
+fn log_dest_only_for_real_files() {
+    use std::str::FromStr;
+    let dest = |s: &str| log_dest(&OutputRef::from_str(s).unwrap());
+    assert_eq!(
+        dest("/out/letter.pdf").unwrap(),
+        Path::new("/out/letter.log")
+    );
+    assert_eq!(dest("/out/letter").unwrap(), Path::new("/out/letter.log"));
+    assert!(dest("-").is_none());
+    assert!(dest("https://s3.example/bucket/letter.pdf").is_none());
+    assert!(log_dest(&OutputRef::Buffer).is_none());
 }
 
 /// Strip a trailing `.j2`/`.jinja`/`.jinja2` so `foo.mkiv.j2` is treated as `foo.mkiv`.
@@ -473,6 +496,19 @@ impl Renderer {
         Ok(templated_file)
     }
 
+    /// Best-effort: keep the ConTeXt log next to the requested output file so a
+    /// failed compile stays debuggable after the temp dir is gone.
+    async fn save_compile_log(&self, log: &Path) {
+        let Some(dest) = log_dest(&self.output) else {
+            return;
+        };
+        if let Err(e) = fs::copy(log, &dest).await {
+            debug!("could not save compile log"; "dest" => dest.display(), "error" => e.to_string());
+        } else {
+            debug!("saved compile log"; "dest" => dest.display());
+        }
+    }
+
     pub async fn compile_pdf(&self, file: &TempFile) -> Result<TempFile> {
         // create TempFile but with .pdf extension
         let path = file.file_path();
@@ -517,7 +553,10 @@ impl Renderer {
             String::from_utf8_lossy(&context_proc.stderr)
         );
 
-        ensure!(status.success(), "Could not compile file");
+        if !status.success() {
+            self.save_compile_log(&path.with_extension("log")).await;
+            bail!("Could not compile file");
+        }
 
         let output_file = TempFile::from_existing(output_file_path, Ownership::Owned)
             .await
