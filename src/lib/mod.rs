@@ -303,6 +303,8 @@ pub struct State {
     reqwest_client: reqwest::Client,
     jinja_env: Arc<minijinja::Environment<'static>>,
     compile_semaphore: Arc<Semaphore>,
+    /// Absolute, so `context --path` still resolves from the temp dir.
+    templates_path: PathBuf,
 }
 
 impl State {
@@ -331,7 +333,11 @@ impl State {
         let syntax_dir = syntax_dir(templates_path.as_ref());
         debug!("loading syntaxes"; "syntax_path" => syntax_dir.display());
         configure_syntax(&mut jinja_env, load_syntaxes(&syntax_dir)?);
-        jinja_env.set_loader(minijinja::path_loader(templates_path));
+        let templates_path = templates_path
+            .as_ref()
+            .canonicalize()
+            .unwrap_or_else(|_| templates_path.as_ref().to_path_buf());
+        jinja_env.set_loader(minijinja::path_loader(&templates_path));
 
         let jinja_env = Arc::new(jinja_env);
         let reqwest_client = build_client();
@@ -349,6 +355,7 @@ impl State {
             jinja_env,
             reqwest_client,
             compile_semaphore,
+            templates_path,
         })
     }
 
@@ -357,6 +364,7 @@ impl State {
             self.reqwest_client.clone(),
             self.jinja_env.clone(),
             self.compile_semaphore.clone(),
+            self.templates_path.clone(),
             job,
         )
         .await
@@ -380,6 +388,7 @@ pub struct Renderer {
     template: TemplateRef,
     output: OutputRef,
     data: HashMap<String, minijinja::Value>,
+    templates_path: PathBuf,
 }
 
 impl Renderer {
@@ -387,6 +396,7 @@ impl Renderer {
         reqwest_client: reqwest::Client,
         jinja_env: Arc<minijinja::Environment<'static>>,
         compile_semaphore: Arc<Semaphore>,
+        templates_path: PathBuf,
         job: RenderJob,
     ) -> Result<Self> {
         let dir = TempDir::new().await?;
@@ -404,6 +414,7 @@ impl Renderer {
             data,
             template: job.template,
             output: job.output,
+            templates_path,
         })
     }
 
@@ -526,6 +537,8 @@ impl Renderer {
         // spawn (not output()) so kill_on_drop reaps the child if we time out.
         let child = Command::new("context")
             .arg("--batchmode")
+            // so `\input`/`\usemodule` in a template find partials/setups/assets
+            .arg(format!("--path={}", self.templates_path.display()))
             .arg(path)
             .current_dir(&self.dir)
             .kill_on_drop(true)
