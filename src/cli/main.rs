@@ -9,7 +9,7 @@ use foundations::{
     telemetry::{
         self,
         log::{self, debug},
-        settings::{Level, TelemetrySettings},
+        settings::{Level, TelemetryServerSettings, TelemetrySettings, TracingSettings},
     },
 };
 
@@ -42,13 +42,24 @@ struct Cli {
 #[tokio::main]
 async fn main() -> BootstrapResult<()> {
     let service_info = foundations::service_info!();
-    let telemetry_settings = TelemetrySettings::default();
-    let telementry_config = TelemetryConfig {
+    // only the logger is wanted; don't bind a telemetry server or set up a jaeger reporter
+    let telemetry_settings = TelemetrySettings {
+        server: TelemetryServerSettings {
+            enabled: false,
+            ..Default::default()
+        },
+        tracing: TracingSettings {
+            enabled: false,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let telemetry_config = TelemetryConfig {
         service_info: &service_info,
         settings: &telemetry_settings,
         custom_server_routes: vec![],
     };
-    telemetry::init(telementry_config)?;
+    telemetry::init(telemetry_config)?;
 
     let opts = Cli::parse();
 
