@@ -79,8 +79,16 @@ impl TemplateRef {
             .unwrap_or(false)
     }
 
-    pub fn extension(&self) -> Option<&str> {
-        Path::new(self.as_ref())
+    /// Template name with an optional trailing `.j2` stripped: the name the
+    /// rendered artifact (and hence the compiler input and output) should have.
+    /// `letter.tex.j2` -> `letter.tex`.
+    pub fn rendered_name(&self) -> &str {
+        let name = self.as_ref();
+        name.strip_suffix(".j2").unwrap_or(name)
+    }
+
+    fn extension(&self) -> Option<&str> {
+        Path::new(self.rendered_name())
             .extension()
             .and_then(|ext| ext.to_str())
     }
@@ -246,6 +254,20 @@ mod test {
             )]))],
         };
         assert_eq!(parsed, renderjob);
+    }
+
+    #[test]
+    fn test_should_compile_strips_j2() {
+        let compile = ["letter.tex", "letter.tex.j2", "a/b.mkiv.j2"];
+        let plain = ["page.html.j2", "notes.txt", "weird.j2"];
+        for t in compile {
+            let r = TemplateRef::try_new(t.to_string()).unwrap();
+            assert!(r.should_compile(), "should compile {t:?}");
+        }
+        for t in plain {
+            let r = TemplateRef::try_new(t.to_string()).unwrap();
+            assert!(!r.should_compile(), "should not compile {t:?}");
+        }
     }
 
     #[test]

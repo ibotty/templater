@@ -272,10 +272,12 @@ impl Renderer {
     }
 
     pub async fn write_template(&self) -> Result<TempFile> {
-        let templated_file =
-            TempFile::new_with_name_in(self.template.as_ref(), self.dir.dir_path().to_owned())
-                .await
-                .context("Could not create template file")?;
+        let templated_file = TempFile::new_with_name_in(
+            self.template.rendered_name(),
+            self.dir.dir_path().to_owned(),
+        )
+        .await
+        .context("Could not create template file")?;
 
         let rendered = self
             .jinja_env
