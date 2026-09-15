@@ -4,7 +4,7 @@ pub mod types;
 
 use std::collections::HashMap;
 use std::os::unix::process::ExitStatusExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -49,6 +49,143 @@ fn configure_escaping(env: &mut minijinja::Environment<'static>) {
     });
 }
 
+/// Scans the first `MAX_LINES` lines for `templater:` and parses `key="value"` pairs.
+/// Values MUST be double-quoted: `<!-- templater: title="Hello World" -->`, `% templater: lang="en"`.
+pub fn parse_magic(content: &str) -> HashMap<String, String> {
+    const MARKER: &str = "templater:";
+    const MAX_LINES: usize = 5;
+
+    content
+        .lines()
+        .take(MAX_LINES)
+        .filter_map(|l| l.split_once(MARKER))
+        .flat_map(|(_, rest)| {
+            // Chunks alternate: `key=`, value, `key=`, value, ..., trailing junk (`-->`).
+            // ponytail: no escapes — a `\"` inside a value ends it. Add a scanner if that shows up.
+            let mut parts = rest.split('"');
+            std::iter::from_fn(move || {
+                let k = parts.next()?.trim().trim_end_matches('=').trim();
+                Some((k.to_string(), parts.next()?.to_string()))
+            })
+        })
+        .filter(|(k, _)| !k.is_empty())
+        .collect()
+}
+
+#[test]
+fn magic() {
+    let m = parse_magic("<!-- templater: title=\"Hello World\" lang=\"en\" -->\n<p>body</p>\n");
+    assert_eq!(m["title"], "Hello World");
+    assert_eq!(m["lang"], "en");
+
+    assert_eq!(parse_magic("% templater: a=\"1\"")["a"], "1");
+    assert_eq!(parse_magic("% templater: p=\"a.tex\"")["p"], "a.tex"); // trailing dot-path, no closer
+    assert!(parse_magic("<!-- templater: a=1 -->").is_empty()); // unquoted rejected
+    assert!(parse_magic("no markers here").is_empty());
+    assert!(parse_magic(&("\n".repeat(9) + "% templater: a=\"1\"")).is_empty()); // too deep
+}
+
+/// A syntax definition as written in a `syntax/*.yaml` / `syntax/*.json` file.
+/// Every field is optional; omitted ones keep minijinja's default delimiters.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SyntaxDef {
+    block: Option<(String, String)>,
+    variable: Option<(String, String)>,
+    comment: Option<(String, String)>,
+    line_statement_prefix: Option<String>,
+    line_comment_prefix: Option<String>,
+}
+
+impl SyntaxDef {
+    fn build(self) -> Result<minijinja::syntax::SyntaxConfig> {
+        let mut b = minijinja::syntax::SyntaxConfig::builder();
+        if let Some((s, e)) = self.block {
+            b.block_delimiters(s, e);
+        }
+        if let Some((s, e)) = self.variable {
+            b.variable_delimiters(s, e);
+        }
+        if let Some((s, e)) = self.comment {
+            b.comment_delimiters(s, e);
+        }
+        if let Some(p) = self.line_statement_prefix {
+            b.line_statement_prefix(p);
+        }
+        if let Some(p) = self.line_comment_prefix {
+            b.line_comment_prefix(p);
+        }
+        Ok(b.build()?)
+    }
+}
+
+/// `SYNTAX_PATH`, else a `syntax/` dir beside `templates_path`, else `./syntax`.
+fn syntax_dir(templates_path: &Path) -> PathBuf {
+    if let Ok(p) = std::env::var("SYNTAX_PATH") {
+        return p.into();
+    }
+    let sibling = templates_path
+        .parent()
+        .unwrap_or(Path::new("."))
+        .join("syntax");
+    if sibling.is_dir() {
+        sibling
+    } else {
+        "./syntax".into()
+    }
+}
+
+/// Loads every `*.yaml`/`*.yml`/`*.json` in `dir` as a named syntax (file stem
+/// = name), plus the baked-in `default`. A missing dir is fine; a malformed or
+/// unbuildable file is a startup error.
+fn load_syntaxes(dir: &Path) -> Result<HashMap<String, minijinja::syntax::SyntaxConfig>> {
+    let mut out = HashMap::new();
+    let entries = match std::fs::read_dir(dir) {
+        Ok(entries) => Some(entries),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => return Err(e).with_context(|| format!("Cannot read {}", dir.display())),
+    };
+    for entry in entries.into_iter().flatten() {
+        let path = entry?.path();
+        let load = |def: Result<SyntaxDef, _>| -> Result<_> { def?.build() };
+        let bytes = std::fs::read(&path)?;
+        let syntax = match path.extension().and_then(|s| s.to_str()) {
+            Some("json") => load(serde_json::from_slice(&bytes).map_err(anyhow::Error::from)),
+            Some("yaml" | "yml") => {
+                load(serde_saphyr::from_slice(&bytes).map_err(anyhow::Error::from))
+            }
+            _ => continue,
+        }
+        .with_context(|| format!("Invalid syntax definition {}", path.display()))?;
+        // unwrap is safe: read_dir yields named files
+        let name = path.file_stem().unwrap().to_string_lossy().into_owned();
+        out.insert(name, syntax);
+    }
+    // baked in, and not overridable
+    out.insert("default".into(), Default::default());
+    Ok(out)
+}
+
+/// Picks a template's syntax from a `templater: syntax="name"` magic line.
+/// Unknown names fall back to `default` with a warning (the callback cannot fail).
+fn configure_syntax(
+    env: &mut minijinja::Environment<'static>,
+    syntaxes: HashMap<String, minijinja::syntax::SyntaxConfig>,
+) {
+    env.set_syntax_callback(move |name, source| {
+        let Some(wanted) = parse_magic(source).remove("syntax") else {
+            return Default::default();
+        };
+        match syntaxes.get(&wanted) {
+            Some(syntax) => syntax.clone(),
+            None => {
+                debug!("unknown syntax, using default"; "template" => name, "syntax" => &wanted);
+                Default::default()
+            }
+        }
+    });
+}
+
 /// Strip a trailing `.j2`/`.jinja`/`.jinja2` so `foo.mkiv.j2` is treated as `foo.mkiv`.
 fn strip_jinja_ext(name: &str) -> &str {
     for ext in [".j2", ".jinja", ".jinja2"] {
@@ -57,6 +194,41 @@ fn strip_jinja_ext(name: &str) -> &str {
         }
     }
     name
+}
+
+#[test]
+fn syntax_from_magic_line() {
+    let dir = std::env::temp_dir().join("templater-syntax-test");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("alt.yaml"), "variable: ['${', '}']\n").unwrap();
+
+    let mut env = minijinja::Environment::new();
+    configure_syntax(&mut env, load_syntaxes(&dir).unwrap());
+    let ctx = minijinja::context! { x => 42 };
+
+    // magic line selects the loaded syntax
+    assert_eq!(
+        env.render_named_str("a.txt", "% templater: syntax=\"alt\"\n${x}", &ctx)
+            .unwrap(),
+        "% templater: syntax=\"alt\"\n42"
+    );
+    // no magic line, unknown name, and explicit "default" all keep jinja syntax
+    for src in ["{{ x }}", "% templater: syntax=\"nope\"\n{{ x }}"] {
+        assert!(
+            env.render_named_str("a.txt", src, &ctx)
+                .unwrap()
+                .ends_with("42"),
+            "should render with default syntax: {src:?}"
+        );
+    }
+    // a missing syntax dir is not an error, and still has "default"
+    assert!(
+        load_syntaxes(Path::new("/nonexistent"))
+            .unwrap()
+            .contains_key("default")
+    );
+
+    std::fs::remove_dir_all(&dir).unwrap();
 }
 
 #[cfg(test)]
@@ -111,7 +283,10 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(templates_path: impl AsRef<Path>, assets_path: Option<impl AsRef<Path>>) -> Self {
+    pub fn new(
+        templates_path: impl AsRef<Path>,
+        assets_path: Option<impl AsRef<Path>>,
+    ) -> Result<Self> {
         let mut jinja_env = minijinja::Environment::new();
 
         jinja_env.set_undefined_behavior(minijinja::UndefinedBehavior::Strict);
@@ -130,6 +305,9 @@ impl State {
         jinja_env.add_filter("qr_mp_pic", filters::qr_encode_to_mp_picture);
 
         configure_escaping(&mut jinja_env);
+        let syntax_dir = syntax_dir(templates_path.as_ref());
+        debug!("loading syntaxes"; "syntax_path" => syntax_dir.display());
+        configure_syntax(&mut jinja_env, load_syntaxes(&syntax_dir)?);
         jinja_env.set_loader(minijinja::path_loader(templates_path));
 
         let jinja_env = Arc::new(jinja_env);
@@ -144,11 +322,11 @@ impl State {
             .unwrap_or(4);
         let compile_semaphore = Arc::new(Semaphore::new(permits));
 
-        State {
+        Ok(State {
             jinja_env,
             reqwest_client,
             compile_semaphore,
-        }
+        })
     }
 
     pub async fn new_job(&self, job: RenderJob) -> Result<Renderer> {

@@ -37,8 +37,9 @@ icu_decimal = { version = "2", features = ["alloc", "ryu"] }
 icu_locale_core = { version = "2", features = [] }
 md-5 = "0.11"
 mime_guess = { version = "2.0.4", default-features = false }
-minijinja = { version = "2", features = [
+minijinja = { git = "https://github.com/ibotty/minijinja", branch = "add-syntax-callback-2", features = [
   "builtins",
+  "custom_syntax",
   "json",
   "loader",
   "macros",

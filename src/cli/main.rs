@@ -94,7 +94,7 @@ async fn main() -> BootstrapResult<()> {
             "template" => template.as_ref(),
     );
 
-    let state = State::new(templates_path, assets_path);
+    let state = State::new(templates_path, assets_path).context("Could not create state")?;
     let inputs = opts.inputs.into_iter().map(types::Input::FileRef).collect();
 
     let renderjob = RenderJob {
