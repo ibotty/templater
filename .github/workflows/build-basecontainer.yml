@@ -8,8 +8,14 @@ on:
     paths:
     - Containerfile.base
 
+permissions:
+  contents: read
+
 jobs:
   base:
+    permissions:
+      contents: read
+      packages: write
     uses: ./.github/workflows/_container.yml
     with:
       image: ${{ github.repository }}-base
