@@ -26,6 +26,9 @@ jobs:
 
   serve:
     needs: build
+    permissions:
+      contents: read
+      packages: write
     uses: ./.github/workflows/_container.yml
     with:
       image: ${{ github.repository }}
@@ -34,6 +37,9 @@ jobs:
 
   cli:
     needs: build
+    permissions:
+      contents: read
+      packages: write
     uses: ./.github/workflows/_container.yml
     with:
       image: ${{ github.repository }}-cli
