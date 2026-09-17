@@ -41,7 +41,7 @@ jobs:
       run: chmod +x target/release/*
 
     - name: Log into registry
-      uses: redhat-actions/podman-login@v1
+      uses: redhat-actions/podman-login@v2
       with:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
