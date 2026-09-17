@@ -28,10 +28,10 @@ jobs:
       contents: read
       packages: write
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
     - if: ${{ inputs.artifact != '' }}
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
       with:
         name: ${{ inputs.artifact }}
         path: target/release
@@ -41,7 +41,7 @@ jobs:
       run: chmod +x target/release/*
 
     - name: Log into registry
-      uses: redhat-actions/podman-login@v1
+      uses: redhat-actions/podman-login@4934294ad0449894bcd1e9f191899d7292469603 # v1
       with:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
