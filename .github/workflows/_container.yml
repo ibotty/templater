@@ -55,7 +55,7 @@ jobs:
 
     - name: Build container
       id: build-image
-      uses: redhat-actions/buildah-build@b82756135cab4976829e15d36e832f2e65442f63 # v2.6.2
+      uses: redhat-actions/buildah-build@719e3c40d8af9790c23eca13f7daa339f2867034 # v3.1.0
       with:
         image: ${{ inputs.image }}
         tags: "latest"
