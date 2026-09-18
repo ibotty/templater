@@ -1,4 +1,4 @@
-FROM quay.io/fedora/fedora-minimal:40
+FROM quay.io/fedora/fedora-minimal:46
 LABEL MAINTAINER "Tobias Florek <tob@butter.sh>"
 LABEL org.opencontainers.image.source "https://github.com/ibotty/templater"
 LABEL org.opencontainers.image.description "Templater base image"
