@@ -1,6 +1,4 @@
-use std::sync::{Arc, Mutex};
-
-use anyhow::{anyhow, ensure};
+use anyhow::{anyhow, bail, ensure};
 use async_tempfile::TempFile;
 use foundations::telemetry::log::{debug, trace};
 use md5::{Digest, Md5};
@@ -9,11 +7,11 @@ use reqwest::{
     IntoUrl,
     header::{self, ETAG},
 };
-use tokio_util::io::{InspectReader, ReaderStream};
+use tokio::io::AsyncReadExt;
 
 pub async fn upload_file(
     client: &reqwest::Client,
-    reader: TempFile,
+    mut reader: TempFile,
     mime_type: Mime,
     target_url: impl IntoUrl,
 ) -> anyhow::Result<()> {
@@ -21,26 +19,24 @@ pub async fn upload_file(
     let target_url_string = target_url.to_string();
     debug!("uploading file"; "url" => &target_url_string);
 
-    // Arc<Mutex>: InspectReader owns an FnMut that mutates the hasher, but we also
-    // need the hasher back after the stream to finalize(); wrap_stream requires the
-    // closure be Send + 'static. Uncontended by construction (bytes flow serially).
-    let hasher = Md5::new();
-    let hasher_rc = Arc::new(Mutex::new(hasher));
+    let mut bytes = Vec::new();
+    reader.read_to_end(&mut bytes).await?;
+    let md5sum = hex::encode(Md5::digest(&bytes));
 
-    let hasher_rc2 = hasher_rc.clone();
-    let hashing_reader = InspectReader::new(reader, move |bytes| {
-        hasher_rc2.lock().unwrap().update(bytes)
-    });
-    let stream = ReaderStream::new(hashing_reader);
-    let body = reqwest::Body::wrap_stream(stream);
+    // Content-Type must be part of the presigned URL's signed params
+    // (ContentType=... when generating it).
     let req = client
         .put(target_url)
         .header(header::CONTENT_TYPE, mime_type.as_ref())
-        .body(body)
+        .body(bytes)
         .build()?;
-    let etag = client
-        .execute(req)
-        .await?
+    let response = client.execute(req).await?;
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        bail!("upload failed with status {status}: {body}");
+    }
+    let etag = response
         .headers()
         .get(ETAG)
         .ok_or(anyhow!("ETAG header not found"))?
@@ -50,12 +46,6 @@ pub async fn upload_file(
     // strip leading and trailing "
     let etag = etag.strip_prefix('"').unwrap_or(&etag);
     let etag = etag.strip_suffix('"').unwrap_or(etag);
-
-    let md5sum = Arc::try_unwrap(hasher_rc)
-        .map_err(|_| anyhow!("Lock still has multiple owners!."))?
-        .into_inner()?
-        .finalize();
-    let md5sum = hex::encode(md5sum);
 
     trace!("uploaded file"; "url" => target_url_string, "md5sum" => &md5sum, "etag" => etag);
 
