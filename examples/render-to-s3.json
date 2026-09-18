@@ -1,0 +1,5 @@
+{
+  "template": "test.j2",
+  "inputs": [{ "name": "World" }],
+  "output": "https://bucket.s3.example.com/reports/output.txt?<presigned-put-query>"
+}
