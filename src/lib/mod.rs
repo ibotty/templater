@@ -147,18 +147,25 @@ fn load_syntaxes(dir: &Path) -> Result<HashMap<String, minijinja::syntax::Syntax
     };
     for entry in entries.into_iter().flatten() {
         let path = entry?.path();
-        let load = |def: Result<SyntaxDef, _>| -> Result<_> { def?.build() };
-        let bytes = std::fs::read(&path)?;
-        let syntax = match path.extension().and_then(|s| s.to_str()) {
-            Some("json") => load(serde_json::from_slice(&bytes).map_err(anyhow::Error::from)),
-            Some("yaml" | "yml") => {
-                load(serde_saphyr::from_slice(&bytes).map_err(anyhow::Error::from))
-            }
-            _ => continue,
+
+        if !path.is_file() {
+            continue;
         }
-        .with_context(|| format!("Invalid syntax definition {}", path.display()))?;
+
+        let parse: fn(&[u8]) -> Result<SyntaxDef> = match path.extension().and_then(|s| s.to_str())
+        {
+            Some("json") => |b| serde_json::from_slice(b).map_err(anyhow::Error::from),
+            Some("yaml" | "yml") => |b| serde_saphyr::from_slice(b).map_err(anyhow::Error::from),
+            _ => continue,
+        };
+
+        let bytes = std::fs::read(&path)?;
+        let syntax = parse(&bytes)
+            .and_then(SyntaxDef::build)
+            .with_context(|| format!("Invalid syntax definition {}", path.display()))?;
         // unwrap is safe: read_dir yields named files
         let name = path.file_stem().unwrap().to_string_lossy().into_owned();
+
         out.insert(name, syntax);
     }
     // baked in, and not overridable
