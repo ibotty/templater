@@ -70,3 +70,30 @@ impl From<anyhow::Error> for AppError {
         }
     }
 }
+
+#[cfg(test)]
+mod error_mapping_tests {
+    use super::*;
+
+    #[test]
+    fn template_not_found_is_meaningful() {
+        let e = anyhow::Error::new(minijinja::Error::from(
+            minijinja::ErrorKind::TemplateNotFound,
+        ))
+        .context("Could not get template");
+        assert!(matches!(AppError::from(e), AppError::TemplateNotFound(_)));
+    }
+
+    #[test]
+    fn missing_field_is_meaningful() {
+        let e = anyhow::Error::new(minijinja::Error::from(minijinja::ErrorKind::UndefinedError))
+            .context("Could not render template");
+        assert!(matches!(AppError::from(e), AppError::MissingField(_)));
+    }
+
+    #[test]
+    fn other_errors_stay_generic() {
+        let e = anyhow::anyhow!("boom");
+        assert!(matches!(AppError::from(e), AppError::AnyError(_)));
+    }
+}
