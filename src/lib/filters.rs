@@ -79,6 +79,32 @@ pub fn context_escape(input: &str) -> String {
     out
 }
 
+/// Escapes a raw URL for use as a `| safe` argument to ConTeXt's `\useURL`.
+/// `\useURL` captures its value with `\detokenize`, which always doubles a
+/// default-catcode-6 `#` (e.g. an anchor: `#section` becomes `##section`),
+/// and `%` starts a TeX comment that would silently truncate the rest of
+/// the line. Prefixing any TeX-special character with `\` sidesteps both:
+/// `\X` isn't catcode 6, so it survives `\detokenize` untouched, and
+/// ConTeXt's own url "untex" cleanup strips the backslash back off,
+/// restoring the single literal character (verified against `context`
+/// directly: `\$\&\_\^\~\{\}\#\%` round-trips to `$&_^~{}#%`).
+/// `\` itself isn't escaped: a raw backslash isn't valid unencoded URL
+/// syntax, and escaping it here would need a real tokenizer to keep the
+/// other `\X` escapes below from re-matching it.
+pub fn url_escape(input: &str) -> Value {
+    let mut out = String::with_capacity(input.len());
+    for c in input.chars() {
+        if matches!(
+            c,
+            '#' | '%' | '$' | '&' | '_' | '^' | '~' | '{' | '}' | '[' | ']'
+        ) {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    Value::from_safe_string(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -93,6 +119,21 @@ mod tests {
         assert_eq!(context_escape("\\{"), "\\letterbackslash{}\\{");
         // plain text is untouched
         assert_eq!(context_escape("hello"), "hello");
+    }
+
+    #[test]
+    fn test_url_escape() {
+        assert_eq!(
+            url_escape("https://example.com/page#section").to_string(),
+            r"https://example.com/page\#section"
+        );
+        assert_eq!(url_escape("a%20b").to_string(), r"a\%20b");
+        assert_eq!(url_escape("$&_^~{}[]x").to_string(), r"\$\&\_\^\~\{\}\[\]x");
+        assert_eq!(
+            url_escape("https://example.com").to_string(),
+            "https://example.com"
+        );
+        assert!(url_escape("x").is_safe());
     }
 
     #[test]
