@@ -45,7 +45,7 @@ minijinja = { git = "https://github.com/ibotty/minijinja", branch = "add-syntax-
   "loader",
   "macros",
 ] }
-nutype = { version = "0.7.0", features = ["serde"] }
+nutype = { version = "0.8.0", features = ["serde"] }
 qrcodegen = "1.8.0"
 reqwest = { version = "0.13", features = ["rustls", "stream"] }
 serde = { version = "1.0.196", features = ["derive"] }
