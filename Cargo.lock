@@ -249,9 +249,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-s3"
-version = "1.151.0"
+version = "1.152.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c82d4b41fe41bfca3c9e1de55645d9a525868ef5ce5e14cee9499ccaf1fc7225"
+checksum = "004d5acbd6850ab58789a43822e0a2ef23927a46b012c17f8fa51253103db9f8"
 dependencies = [
  "arc-swap",
  "aws-credential-types",
@@ -1566,9 +1566,9 @@ dependencies = [
 
 [[package]]
 name = "foundations"
-version = "5.10.2"
+version = "5.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39b6f625bd3b1c5f7f224fd873eefe003e210b1e40d139e3a8e3675ae4b589f7"
+checksum = "28037925204b8dad3d2992c1edfe77f3d8bd2733ab76e34e5268bd53ce8580d4"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -1623,9 +1623,9 @@ dependencies = [
 
 [[package]]
 name = "foundations-macros"
-version = "5.10.2"
+version = "5.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70ef081860e2d5e7d37728b92f72ebca6405ed20cd7b9d3abb830d7ecebb215a"
+checksum = "7db5f4eb948b440321063d4be387faae5c968632afa92801a62a29a049bce8d4"
 dependencies = [
  "darling 0.23.0",
  "proc-macro2",
@@ -3522,7 +3522,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.4.15",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4345,9 +4345,9 @@ checksum = "fd3ca314f692efd6c868f8408f53fe444634a845f96c028b97d35f6a1f79f0ee"
 
 [[package]]
 name = "tokio"
-version = "1.53.1"
+version = "1.53.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "202caea871b69668250d242070849eb495be178ed697a3e98aebce5bc81a0bed"
+checksum = "e95f91fcc7a621e8b030f6aa23c71fe9838ae2fb4d8118b75602a328f5144044"
 dependencies = [
  "bytes",
  "libc",
@@ -4887,15 +4887,6 @@ name = "windows-sys"
 version = "0.52.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "282be5f36a8ce781fad8c8ae18fa3f9beff57ec1b52cb3de0789201425d9a33d"
-dependencies = [
- "windows-targets",
-]
-
-[[package]]
-name = "windows-sys"
-version = "0.59.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e38bc4d79ed67fd075bcc251a1c39b32a1776bbe92e5bef1f0bf1f8c531853b"
 dependencies = [
  "windows-targets",
 ]
