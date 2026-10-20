@@ -49,7 +49,7 @@ nutype = { version = "0.8.0", features = ["serde"] }
 qrcodegen = "1.8.0"
 reqwest = { version = "0.13", features = ["rustls", "stream"] }
 serde = { version = "1.0.196", features = ["derive"] }
-serde-saphyr = { version = "1.2.0", default-features = false, features = [
+serde-saphyr = { version = "2.0.0", default-features = false, features = [
   "deserialize",
 ] }
 serde_json = "1.0.114"
